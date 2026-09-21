@@ -20,10 +20,14 @@
 - `ss-screen` 仍映射到 [`src/ssscreen/cli/app.py`](../../src/ssscreen/cli/app.py)，是科研行为的权威入口。
 - `ss-screen-gui` 只启动 GUI；运行任务时调用真实 CLI。Windows 后端使用当前解释器，WSL 后端通过
   `wsl.exe bash -lc` 进入工程目录、激活 `.venv` 或 `.venv-mlp` 后执行 `ss-screen ...`。
+- 右侧运行后端默认使用 WSL 自动选择：前中段和 SQS 使用 `.venv`，MACE relax、phonon 与
+  phase-diagram 使用 `.venv-mlp`；误选 `.venv-mlp` 跑 SQS 时会自动回退到 `.venv`。
 - `src/ssscreen/gui/app.py` 可被 PyCharm 直接运行；启动时会从脚本目录向上识别仓库根目录，
   避免 WSL 后端误在 `src/ssscreen/gui` 子目录中查找 `.venv`。
 - GUI 发往 WSL 的相对路径会统一把 Windows 反斜杠转换为 `/`；组成筛选页只自动加入真实存在的
   `01_dataset/*.df`，避免不存在的 `mp.df/wbm.df` 被带入命令。
+- GUI 专用页面会把旧的 `src/ssscreen/gui/...` 阶段路径归一化为工程根目录相对路径；例如
+  `src/ssscreen/gui/03_condensed/local` 会显示并执行为 `03_condensed/local`。
 - 数据源页支持 `dataset structures`，可把本地 POSCAR/CIF 文件夹导入为 Stage 1 DataFrame；结构归档页的
   “添加文件夹”会递归扫描子目录中的 POSCAR/CONTCAR。
 - GUI 可以保存界面流程和用户输入体验，但不得引入 preview-only/mock CLI 替代正式命令。
@@ -32,6 +36,11 @@
   `data/mace-mpa-0-medium.model`、`work/real-pbe-mace-20260914-run4/05_gap/vasp_by_task_id`
   和 MP API 后端；前中段默认输出目录为 `01_dataset` 至 `12_recommend`。
 - Stage 11 API 后端可读取右侧 Properties 注入的 `MP_API_KEY` 环境变量，不需要在 GUI 控制台交互输入。
+- 当前 GUI 为整套演示流程隐藏后段拆分调试命令：Stage 10 只显示 `phonon-run`，Stage 11 只显示
+  `phase-diagram`；拆分命令仍保留在 CLI 中。
+- Stage 12 使用专用结果报告页，内嵌 Markdown 报告预览，并合并推荐、pair、SQS、混合焓、声子和
+  凸包关键字段展示候选材料的具体数值与结构文件路径。
+- 工具栏显示运行状态和不确定进度条，用于提示当前后端任务仍在计算。
 
 ## 验证建议
 
@@ -43,6 +52,14 @@
 
 ## 最近同步
 
+- 2026-09-18：声子一步式运行的 `--max-input-force` 默认值由 `0.01` 调整为 `0.02 eV/Angstrom`，
+  并将该页面的 `--include-endmembers` 设为默认勾选。
+- 2026-09-17：简化 GUI 后段流程显示，隐藏 Stage 10/11 拆分命令；`--include-endmembers` 默认勾选并只
+  显示正向选项；新增 Stage 12 Markdown 报告/候选证据表页和运行状态进度条。
+- 2026-09-16：GUI 路径显示/解析新增旧子目录残留归一化；结构匹配页的归档默认和旧路径追加场景均会
+  落到 `03_condensed/local`，左侧工程树 Stage 03/04 也会统计 `03_condensed/local`。
+- 2026-09-16：运行后端新增 WSL 自动选择，避免 SQS 用 `.venv-mlp` 读取 NumPy 2 生成的
+  `local_structures.df` 时触发 `numpy._core.numeric` pickle 兼容错误。
 - 2026-09-12：修复 PyCharm 直接运行 `app.py` 时默认工程落在 `src/ssscreen/gui` 的问题；GUI 现在会
   自动识别仓库根目录，WSL 后端留空工程路径时会进入仓库根再激活 `.venv` 或 `.venv-mlp`。
 - 2026-09-12：修复组成筛选页残留旧子目录 DataFrame 路径、默认带入缺失 `mp.df/wbm.df` 和 WSL

@@ -64,6 +64,61 @@
 
 ## 同步记录
 
+### 2026-09-18 — 调整声子输入残余力默认阈值
+
+- 真实变更：`src/ssscreen/config.py` 将 `PhononSettings.max_input_force` 从 `0.01` 调整为
+  `0.02 eV/Angstrom`，CLI 和 GUI 声子命令预览同步继承新默认值。
+- 真实变更：GUI 的 `stability phonon-run` preset 默认勾选 `--include-endmembers`，一步式声子任务会把
+  已驰豫端元结构纳入计算。
+- ZMD 更新：同步 GUI、stability 源码导航、本索引和项目日志。
+
+### 2026-09-17 — 优化 GUI 后段流程与报告展示
+
+- 真实变更：`src/ssscreen/gui/metadata.py` 隐藏 Stage 10 的声子拆分三步和 Stage 11 的竞争相拆分三步；
+  GUI 当前只显示 `stability phonon-run` 与 `stability phase-diagram` 两个一步式后段命令，CLI 保留拆分命令。
+- 真实变更：`src/ssscreen/gui/app.py` 的通用布尔选项显示不再展示正反双标签；`--include-endmembers`
+  preset 默认勾选，并会正确出现在 MACE relax 命令预览中。
+- 真实变更：新增 Stage 12 专用报告页，内嵌 `12_recommend/recommendation_report.md` Markdown 预览，
+  并把 `recommendations.csv` 与 pair、SQS manifest、mixing、phonon、phase 证据合并为候选表。
+- 真实变更：工具栏新增运行状态文字与不确定进度条，任务运行时显示“正在计算”和最新输出摘要。
+- ZMD 更新：同步 GUI 源码导航、本索引和项目日志。
+- 验证：WSL `.venv` 下 `python -m py_compile src/ssscreen/gui/app.py src/ssscreen/gui/metadata.py` 通过；
+  Windows `C:\SoftWare\Python\python.exe` + PySide6 验证隐藏命令、`include-endmembers` 默认勾选且生成
+  `--include-endmembers`，Stage 12 读取到 1 条推荐和 Markdown 报告。
+
+### 2026-09-16 — 修正 GUI 阶段路径归一化
+
+- 真实变更：`src/ssscreen/gui/app.py` 新增 GUI 子目录残留路径归一化，专用页面在显示、解析和运行时会把
+  `src/ssscreen/gui/...` 下的阶段目录折回工程根目录相对路径；结构匹配页保存归档目录时也使用归一化后的
+  `03_condensed/local`。
+- 真实变更：左侧工程树 Stage 03/04 统计补充 `03_condensed/local`，使本地 POSCAR/CONTCAR 归档产物能被
+  正确计入结构描述和结构匹配准备状态。
+- 真实变更：右侧运行后端新增 WSL 自动选择模式；前中段和 SQS 使用 `.venv`，MACE relax、phonon 与
+  phase-diagram 使用 `.venv-mlp`；误选 `.venv-mlp` 跑 SQS 时自动回退 `.venv`，避免 NumPy pickle
+  跨环境不兼容。
+- ZMD 更新：同步 GUI 源码导航和本索引；项目日志记录该 GUI 路径修复。
+- 验证：WSL `.venv` 下 `python -m py_compile src/ssscreen/gui/app.py src/ssscreen/gui/metadata.py` 通过；
+  Windows `C:\SoftWare\Python\python.exe` + PySide6 验证从 `src/ssscreen/gui` 启动时活动工程识别为仓库根，
+  结构匹配命令预览为 `--condensed-dir 03_condensed/local`。
+- 验证：Windows GUI 后端选择逻辑确认 SQS 预览使用 `.venv/bin/activate`、MACE relax 使用
+  `.venv-mlp/bin/activate`；WSL `.venv` 实际复跑 `stability sqs-generate` 得到
+  `written=1 skipped=0`。
+
+### 2026-09-15 — 补跑 MP API 竞争相凸包
+
+- 运行产物：第一次 `work/real-pbe-mace-20260914-run4/11_phase_api/` 因 MP API read timeout
+  得到 `missing_elemental_reference`；第二次 `work/real-pbe-mace-20260914-run4/11_phase_api_retry/`
+  使用 `--thermo-type GGA_GGA+U --api-timeout 180` 成功。
+- 运行结果：MP API 查询 `Ca-Se-Te` 体系得到 25 个竞争相，25 个竞争相 MACE relaxation 可用；
+  `phase_stability.csv` 中 CaSe-CaTe SQS 的 hull distance 为 `0.3497941494 eV/atom`，
+  `hull_signal=unstable`，`competing_set_complete=True`，MP database version 为 `2026.04.13`。
+- 推荐输出：新增 `work/real-pbe-mace-20260914-run4/12_recommend_api/`，推荐仍为
+  `low-priority`，证据等级 L5，风险包含 `phase:above_low_priority_threshold`。
+- 文档更新：`docs/real_vasp_mace_pipeline_2026-09-14.md` 记录真实 API hull 结果；
+  `docs/gui_full_pipeline_runbook_2026-09-14.md` 和 `src/ssscreen/gui/metadata.py` 的 Stage 11
+  默认参数补充 `GGA_GGA+U` 与 180 秒 API timeout。
+- 验证：本次未运行 DFT、AiiDA 或 notebook；MP API Key 未写入源码、日志或文档。
+
 ### 2026-09-14 — 调整 GUI 默认参数并新增全流程操作单
 
 - 真实变更：`src/ssscreen/gui/metadata.py` 和 `src/ssscreen/gui/app.py` 的默认路径/参数切换为

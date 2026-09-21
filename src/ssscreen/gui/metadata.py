@@ -56,13 +56,7 @@ COMMANDS: tuple[CommandPresentation, ...] = (
     CommandPresentation("07", "生成 SQS", ("stability", "sqs-generate")),
     CommandPresentation("08", "MACE 结构驰豫", ("stability", "relax")),
     CommandPresentation("09", "混合焓计算", ("stability", "mixing-enthalpy")),
-    CommandPresentation("10", "声子任务导出", ("stability", "phonon-export")),
-    CommandPresentation("10", "声子位移力计算", ("stability", "phonon-forces")),
-    CommandPresentation("10", "声子结果收集", ("stability", "phonon-collect")),
     CommandPresentation("10", "声子谱一步式运行", ("stability", "phonon-run")),
-    CommandPresentation("11", "竞争相导出", ("stability", "competing-export")),
-    CommandPresentation("11", "竞争相驰豫", ("stability", "competing-relax")),
-    CommandPresentation("11", "统一基准凸包", ("stability", "convex-hull")),
     CommandPresentation("11", "竞争相与凸包一步式运行", ("stability", "phase-diagram")),
     CommandPresentation("12", "综合推荐", ("recommend",)),
 )
@@ -199,6 +193,7 @@ PATH_PRESETS: dict[tuple[str, ...], dict[str, Any]] = {
     },
     ("stability", "phonon-run"): {
         "--relax-results": "08_relax/relaxation_results.jsonl",
+        "--include-endmembers": True,
         "--supercell": "1,1,1",
         "--allow-loose-input": True,
         "--mesh": "6,6,6",
@@ -212,6 +207,8 @@ PATH_PRESETS: dict[tuple[str, ...], dict[str, Any]] = {
     ("stability", "competing-export"): {
         "--relax-results": "08_relax/relaxation_results.jsonl",
         "--mp-backend": "api",
+        "--thermo-type": "GGA_GGA+U",
+        "--api-timeout": "180",
         "--output-dir": "11_phase/competing",
         "--manifest": "11_phase/competing_manifest.jsonl",
         "--report": "11_phase/competing_export_report.json",
@@ -237,6 +234,8 @@ PATH_PRESETS: dict[tuple[str, ...], dict[str, Any]] = {
     ("stability", "phase-diagram"): {
         "--relax-results": "08_relax/relaxation_results.jsonl",
         "--mp-backend": "api",
+        "--thermo-type": "GGA_GGA+U",
+        "--api-timeout": "180",
         "--model-path": "data/mace-mpa-0-medium.model",
         "--model-name": "mace-mpa-0-medium",
         "--device": "cuda:0",

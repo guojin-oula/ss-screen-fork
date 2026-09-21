@@ -1,0 +1,2 @@
+,comp_a,comp_b,gap_a,gap_b,mp_id_a,mp_id_b,gap_direct_a,gap_direct_b,source_group_index,gap_method
+0,CaSe,CaTe,0.7877000000000001,0.0063999999999992,CaSe,CaTe,True,False,0,pbe-vasp-final-v1

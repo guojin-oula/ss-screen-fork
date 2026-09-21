@@ -41,6 +41,7 @@ try:
         QMainWindow,
         QMessageBox,
         QPlainTextEdit,
+        QProgressBar,
         QPushButton,
         QScrollArea,
         QSizePolicy,
@@ -51,6 +52,7 @@ try:
         QTabWidget,
         QTreeView,
         QTreeWidget,
+        QTextBrowser,
         QTreeWidgetItem,
         QVBoxLayout,
         QWidget,
@@ -79,6 +81,16 @@ PROJECT_DIRS = tuple(directory for _sid, _name, directory in STAGES if directory
     "logs",
     "models",
 )
+GUI_PACKAGE_RELATIVE_ROOT = ("src", "ssscreen", "gui")
+WSL_VENV_ACTIVATE = ".venv/bin/activate"
+WSL_MLP_VENV_ACTIVATE = ".venv-mlp/bin/activate"
+MLP_COMMANDS = {
+    ("stability", "relax"),
+    ("stability", "phonon-forces"),
+    ("stability", "phonon-run"),
+    ("stability", "competing-relax"),
+    ("stability", "phase-diagram"),
+}
 
 
 def _find_project_root(path: Path) -> Path:
@@ -99,6 +111,39 @@ def _find_project_root(path: Path) -> Path:
         ):
             return candidate
     return current
+
+
+def _strip_gui_package_prefix(value: str) -> str:
+    normalized = value.replace("\\", "/")
+    prefix = "/".join(GUI_PACKAGE_RELATIVE_ROOT) + "/"
+    if normalized.startswith(prefix):
+        remainder = normalized[len(prefix):]
+        if remainder.split("/", 1)[0] in PROJECT_DIRS:
+            return remainder
+    return normalized
+
+
+def _project_display_path(project_root: Path, path: Path) -> str:
+    try:
+        relative = str(path.resolve().relative_to(project_root)).replace("\\", "/")
+    except Exception:
+        return str(path)
+    return _strip_gui_package_prefix(relative)
+
+
+def _resolve_project_path(project_root: Path, value: str) -> Path:
+    text = _strip_gui_package_prefix(value.strip())
+    path = Path(text).expanduser()
+    if not path.is_absolute():
+        return project_root / path
+
+    try:
+        relative = path.resolve().relative_to(project_root)
+    except Exception:
+        return path
+
+    normalized = _strip_gui_package_prefix(str(relative))
+    return project_root / normalized
 
 
 @dataclass
@@ -144,7 +189,7 @@ class ValueEditor(QWidget):
         if option.is_bool_flag:
             self._mode = "bool"
             self.widget = QCheckBox()
-            self.widget.setChecked(bool(option.default))
+            self.widget.setChecked(bool(self._initial_value()))
             self.widget.toggled.connect(self.changed)
             layout.addWidget(self.widget)
             layout.addStretch(1)
@@ -362,7 +407,7 @@ class CommandPage(QWidget):
             self.editors.append((param, editor))
 
             flag_text = param.opts[0] if param.opts else param.name
-            if param.secondary_opts:
+            if param.secondary_opts and not param.is_bool_flag:
                 flag_text += " / " + param.secondary_opts[0]
             if param.required:
                 flag_text += "  *"
@@ -566,16 +611,10 @@ class DatasetSourcePage(QWidget):
         return Path(self.project_provider()).expanduser().resolve()
 
     def _resolve(self, text: str) -> Path:
-        path = Path(text.strip()).expanduser()
-        if not path.is_absolute():
-            path = self._project_root() / path
-        return path
+        return _resolve_project_path(self._project_root(), text)
 
     def _display_path(self, path: Path) -> str:
-        try:
-            return str(path.resolve().relative_to(self._project_root()))
-        except Exception:
-            return str(path)
+        return _project_display_path(self._project_root(), path)
 
     def _path_editor(
         self,
@@ -1357,16 +1396,10 @@ class CompositionScreenPage(QWidget):
         return Path(self.project_provider()).expanduser().resolve()
 
     def _display_path(self, path: Path) -> str:
-        try:
-            return str(path.resolve().relative_to(self._project_root()))
-        except Exception:
-            return str(path)
+        return _project_display_path(self._project_root(), path)
 
     def _resolve(self, text: str) -> Path:
-        path = Path(text.strip()).expanduser()
-        if not path.is_absolute():
-            path = self._project_root() / path
-        return path
+        return _resolve_project_path(self._project_root(), text)
 
     def _path_editor(
         self,
@@ -1603,13 +1636,8 @@ class CompositionScreenPage(QWidget):
 
     def _append_dataframe(self, path: Path | str) -> None:
         raw = str(path)
-        candidate = Path(raw).expanduser()
-        if not candidate.is_absolute():
-            resolved = self._project_root() / candidate
-            display = raw
-        else:
-            resolved = candidate
-            display = self._display_path(candidate)
+        resolved = self._resolve(raw)
+        display = self._display_path(resolved)
 
         canonical = str(resolved.resolve())
         if canonical in self._dataframe_paths():
@@ -2300,16 +2328,10 @@ class StructureArchivePage(QWidget):
         return Path(self.project_provider()).expanduser().resolve()
 
     def _display_path(self, path: Path) -> str:
-        try:
-            return str(path.resolve().relative_to(self._project_root()))
-        except Exception:
-            return str(path)
+        return _project_display_path(self._project_root(), path)
 
     def _resolve(self, value: str) -> Path:
-        path = Path(value.strip()).expanduser()
-        if not path.is_absolute():
-            path = self._project_root() / path
-        return path
+        return _resolve_project_path(self._project_root(), value)
 
     def _path_editor(
         self,
@@ -2925,16 +2947,10 @@ class StructureMatchPage(QWidget):
         return Path(self.project_provider()).expanduser().resolve()
 
     def _display_path(self, path: Path) -> str:
-        try:
-            return str(path.resolve().relative_to(self._project_root()))
-        except Exception:
-            return str(path)
+        return _project_display_path(self._project_root(), path)
 
     def _resolve(self, text: str) -> Path:
-        path = Path(text.strip()).expanduser()
-        if not path.is_absolute():
-            path = self._project_root() / path
-        return path
+        return _resolve_project_path(self._project_root(), text)
 
     def _path_editor(
         self,
@@ -3162,14 +3178,15 @@ class StructureMatchPage(QWidget):
         return values
 
     def _append_archive(self, path: Path) -> None:
-        canonical = str(path.resolve())
+        resolved = self._resolve(str(path))
+        canonical = str(resolved.resolve())
         if canonical in self._archive_paths():
             return
 
         row = self.archive_table.rowCount()
         self.archive_table.insertRow(row)
 
-        item = QTableWidgetItem(self._display_path(path))
+        item = QTableWidgetItem(self._display_path(resolved))
         item.setData(Qt.UserRole, canonical)
         self.archive_table.setItem(row, 0, item)
         self.archive_table.setItem(row, 1, QTableWidgetItem("—"))
@@ -3672,6 +3689,294 @@ STRUCTURE_MATCH_OBJECTS = (
 )
 
 
+def _read_csv_dicts(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            return list(csv.DictReader(handle))
+    except Exception:
+        return []
+
+
+def _row_by_pair_index(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    result: dict[str, dict[str, str]] = {}
+    for index, row in enumerate(rows):
+        key = row.get("pair_index") or row.get("") or str(index)
+        if key and key not in result:
+            result[key] = row
+    return result
+
+
+def _read_jsonl_dicts(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    record = json.loads(line)
+                    if isinstance(record, dict):
+                        rows.append(record)
+    except Exception:
+        return []
+    return rows
+
+
+def _compact_value(value: object, *, max_len: int = 96) -> str:
+    text = "" if value is None else str(value)
+    text = text.replace("\n", " ").strip()
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1] + "…"
+
+
+class RecommendationReportPage(QWidget):
+    """Readable Stage 12 report and evidence view for presentation/use."""
+
+    run_requested = Signal(list, str)
+
+    def __init__(self, project_provider, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.project_provider = project_provider
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 10, 12, 10)
+        root.setSpacing(7)
+
+        header = QHBoxLayout()
+        title = QLabel("综合推荐与结果报告")
+        title.setObjectName("pageTitle")
+        header.addWidget(title)
+        header.addStretch(1)
+        self.badge = QLabel("Stage 12")
+        self.badge.setObjectName("stateBadge")
+        header.addWidget(self.badge)
+        root.addLayout(header)
+
+        subtitle = QLabel(
+            "这里汇总最终推荐结果、Markdown 报告和各阶段证据数值。"
+            "推荐等级只用于后续复核优先级，不等同于材料已经被证明稳定或可合成。"
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setObjectName("pageDescription")
+        root.addWidget(subtitle)
+
+        summary_box = QGroupBox("Summary / 汇总")
+        summary_form = QFormLayout(summary_box)
+        summary_form.setContentsMargins(8, 10, 8, 8)
+        self.generated_label = QLabel("-")
+        self.count_label = QLabel("-")
+        self.class_label = QLabel("-")
+        self.evidence_label = QLabel("-")
+        for label in (
+            self.generated_label,
+            self.count_label,
+            self.class_label,
+            self.evidence_label,
+        ):
+            label.setWordWrap(True)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        summary_form.addRow("生成时间", self.generated_label)
+        summary_form.addRow("推荐数量", self.count_label)
+        summary_form.addRow("分类统计", self.class_label)
+        summary_form.addRow("证据等级", self.evidence_label)
+        root.addWidget(summary_box)
+
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+
+        table_page = QWidget()
+        table_layout = QVBoxLayout(table_page)
+        table_layout.setContentsMargins(0, 4, 0, 0)
+        self.recommendation_table = QTableWidget(0, 17)
+        self.recommendation_table.setHorizontalHeaderLabels(
+            [
+                "Rank",
+                "Class",
+                "Evidence",
+                "Pair",
+                "x(B)",
+                "Gap A/B (eV)",
+                "Mixing meV/atom",
+                "Phonon",
+                "Min freq THz",
+                "Hull eV/atom",
+                "Hull signal",
+                "MP backend",
+                "Structure ID",
+                "SQS file",
+                "Endmembers",
+                "Risks",
+                "Next steps",
+            ]
+        )
+        self.recommendation_table.verticalHeader().setVisible(False)
+        self.recommendation_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.recommendation_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.recommendation_table.setAlternatingRowColors(True)
+        self.recommendation_table.setMinimumHeight(260)
+        self.recommendation_table.horizontalHeader().setStretchLastSection(True)
+        for column, width in enumerate(
+            [46, 92, 70, 120, 58, 110, 118, 88, 92, 98, 82, 80, 210, 230, 230, 220, 240]
+        ):
+            self.recommendation_table.setColumnWidth(column, width)
+        table_layout.addWidget(self.recommendation_table)
+        self.tabs.addTab(table_page, "推荐候选 / Candidates")
+
+        report_page = QWidget()
+        report_layout = QVBoxLayout(report_page)
+        report_layout.setContentsMargins(0, 4, 0, 0)
+        self.report_view = QTextBrowser()
+        self.report_view.setOpenExternalLinks(False)
+        self.report_view.setObjectName("reportViewer")
+        report_layout.addWidget(self.report_view)
+        self.tabs.addTab(report_page, "Markdown 报告")
+
+        root.addWidget(self.tabs, 1)
+
+        actions = QHBoxLayout()
+        refresh = QPushButton("刷新结果")
+        refresh.clicked.connect(self.refresh)
+        open_report = QPushButton("打开 Markdown")
+        open_report.clicked.connect(self._open_report)
+        run = QPushButton("生成综合推荐")
+        run.setObjectName("primaryButton")
+        run.clicked.connect(self._run_recommend)
+        actions.addWidget(refresh)
+        actions.addStretch(1)
+        actions.addWidget(open_report)
+        actions.addWidget(run)
+        root.addLayout(actions)
+
+        self.refresh()
+
+    def _project_root(self) -> Path:
+        return Path(self.project_provider()).expanduser().resolve()
+
+    def _path(self, relative: str) -> Path:
+        return self._project_root() / relative
+
+    def _summary(self) -> dict[str, Any]:
+        path = self._path("12_recommend/recommendation_summary.json")
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def refresh(self) -> None:
+        summary = self._summary()
+        self.generated_label.setText(str(summary.get("generated_at") or "-"))
+        self.count_label.setText(str(summary.get("recommendation_count") or "0"))
+        self.class_label.setText(
+            json.dumps(summary.get("classification_counts") or {}, ensure_ascii=False)
+        )
+        self.evidence_label.setText(
+            json.dumps(summary.get("evidence_level_counts") or {}, ensure_ascii=False)
+        )
+
+        recommendations = _read_csv_dicts(self._path("12_recommend/recommendations.csv"))
+        pairs = _row_by_pair_index(_read_csv_dicts(self._path("06_pair/final_pairs.csv")))
+        mixing = _row_by_pair_index(_read_csv_dicts(self._path("09_mixing/mixing_enthalpy.csv")))
+        phonons = _row_by_pair_index(_read_csv_dicts(self._path("10_phonon/phonon_summary.csv")))
+        phase = _row_by_pair_index(_read_csv_dicts(self._path("11_phase/phase_stability.csv")))
+        sqs_manifest = _row_by_pair_index(
+            [
+                {key: str(value) for key, value in row.items()}
+                for row in _read_jsonl_dicts(self._path("07_sqs/sqs_manifest.jsonl"))
+            ]
+        )
+
+        self.recommendation_table.setRowCount(0)
+        for rec in recommendations:
+            pair_key = rec.get("pair_index", "")
+            pair = pairs.get(pair_key, {})
+            mix = mixing.get(pair_key, {})
+            phonon = phonons.get(pair_key, {})
+            hull = phase.get(pair_key, {})
+            sqs = sqs_manifest.get(pair_key, {})
+            endmembers = " / ".join(
+                item
+                for item in (
+                    sqs.get("endpoint_a_structure_path"),
+                    sqs.get("endpoint_b_structure_path"),
+                )
+                if item
+            )
+
+            values = [
+                rec.get("rank"),
+                rec.get("classification"),
+                rec.get("evidence_level"),
+                f"{rec.get('comp_a') or pair.get('comp_a')} / {rec.get('comp_b') or pair.get('comp_b')}",
+                rec.get("actual_fraction_b") or rec.get("target_fraction_b"),
+                f"{rec.get('gap_a_eV') or pair.get('gap_a')} / {rec.get('gap_b_eV') or pair.get('gap_b')}",
+                rec.get("mixing_enthalpy_meV_per_atom")
+                or mix.get("mixing_enthalpy_meV_per_atom"),
+                rec.get("dynamical_status") or phonon.get("dynamical_status"),
+                rec.get("minimum_mesh_frequency_THz")
+                or phonon.get("minimum_mesh_frequency_THz"),
+                rec.get("energy_above_hull_eV_per_atom")
+                or hull.get("energy_above_hull_eV_per_atom"),
+                rec.get("hull_signal") or hull.get("hull_signal"),
+                rec.get("mp_source_backend") or hull.get("mp_source_backend"),
+                rec.get("structure_id") or phonon.get("structure_id") or hull.get("structure_id"),
+                sqs.get("structure_path"),
+                endmembers,
+                rec.get("risks"),
+                rec.get("recommended_next_steps"),
+            ]
+            row_index = self.recommendation_table.rowCount()
+            self.recommendation_table.insertRow(row_index)
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(_compact_value(value))
+                item.setToolTip("" if value is None else str(value))
+                self.recommendation_table.setItem(row_index, column, item)
+
+        report_path = self._path("12_recommend/recommendation_report.md")
+        if report_path.exists():
+            text = report_path.read_text(encoding="utf-8", errors="replace")
+            try:
+                self.report_view.setMarkdown(text)
+            except AttributeError:
+                self.report_view.setPlainText(text)
+        else:
+            self.report_view.setPlainText(
+                "尚未生成 recommendation_report.md。点击“生成综合推荐”后刷新。"
+            )
+
+    def _open_report(self) -> None:
+        path = self._path("12_recommend/recommendation_report.md")
+        if path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        else:
+            QMessageBox.information(self, "报告不存在", f"尚未生成：\n{path}")
+
+    def _run_recommend(self) -> None:
+        argv = [
+            "recommend",
+            "--pairs",
+            "06_pair/final_pairs.csv",
+            "--gap-results",
+            "05_gap/results_normalized.csv",
+            "--mixing-enthalpy",
+            "09_mixing/mixing_enthalpy.csv",
+            "--phonons",
+            "10_phonon/phonon_summary.csv",
+            "--phase-stability",
+            "11_phase/phase_stability.csv",
+            "--output",
+            "12_recommend/recommendations.csv",
+            "--report",
+            "12_recommend/recommendation_report.md",
+            "--summary",
+            "12_recommend/recommendation_summary.json",
+        ]
+        self.run_requested.emit(argv, "综合推荐")
+
 
 class Dashboard(QWidget):
     """Dense project overview, closer to a CAE workbench than a slide dashboard."""
@@ -3810,8 +4115,9 @@ class InspectorPanel(QWidget):
         runtime_form.setContentsMargins(8, 10, 8, 8)
         self.runtime_backend = QComboBox()
         self.runtime_backend.addItem("Windows Python / 当前解释器", ("windows", ""))
-        self.runtime_backend.addItem("WSL Python / .venv", ("wsl", ".venv/bin/activate"))
-        self.runtime_backend.addItem("WSL Python / .venv-mlp", ("wsl", ".venv-mlp/bin/activate"))
+        self.runtime_backend.addItem("WSL Python / 自动选择", ("wsl-auto", ""))
+        self.runtime_backend.addItem("WSL Python / .venv", ("wsl", WSL_VENV_ACTIVATE))
+        self.runtime_backend.addItem("WSL Python / .venv-mlp", ("wsl", WSL_MLP_VENV_ACTIVATE))
         self.runtime_backend.setCurrentIndex(1)
         runtime_form.addRow("运行后端", self.runtime_backend)
 
@@ -3825,7 +4131,7 @@ class InspectorPanel(QWidget):
         runtime_form.addRow("MP API Key", self.api_key)
         note = QLabel(
             "MP API Key 仅注入当前任务进程，不写入命令或项目文件。"
-            "WSL 模式会调用 wsl.exe 并在工程目录中激活所选虚拟环境。"
+            "WSL 自动选择会用 .venv 跑前中段/SQS，用 .venv-mlp 跑 MACE、phonon 和 phase-diagram。"
         )
         note.setWordWrap(True)
         note.setObjectName("optionHelp")
@@ -3942,6 +4248,15 @@ class MainWindow(QMainWindow):
         tools.addWidget(sep)
         add_tool("从工作区移除", self.remove_active_project)
         tools.addStretch(1)
+        self.run_state_label = QLabel("空闲")
+        self.run_state_label.setObjectName("runStateLabel")
+        tools.addWidget(self.run_state_label)
+        self.run_progress = QProgressBar()
+        self.run_progress.setObjectName("runProgress")
+        self.run_progress.setRange(0, 0)
+        self.run_progress.setFixedWidth(150)
+        self.run_progress.setVisible(False)
+        tools.addWidget(self.run_progress)
         add_tool("■ 停止", self.stop_process, "stopButton")
         root.addWidget(toolbar)
 
@@ -4011,6 +4326,10 @@ class MainWindow(QMainWindow):
         self.structure_match_page = StructureMatchPage(self.project_root)
         self.structure_match_page.run_requested.connect(self.run_command)
         self.stack.addWidget(self.structure_match_page)
+
+        self.recommendation_report_page = RecommendationReportPage(self.project_root)
+        self.recommendation_report_page.run_requested.connect(self.run_command)
+        self.stack.addWidget(self.recommendation_report_page)
 
         document_layout.addWidget(self.stack, 1)
         center_split.addWidget(document_frame)
@@ -4390,7 +4709,7 @@ class MainWindow(QMainWindow):
                     elif sid == "03":
                         archive_root = project.path / "03_condensed"
                         description_count = 0
-                        for folder_name in ("mp", "user"):
+                        for folder_name in ("local", "mp", "user"):
                             folder = archive_root / folder_name
                             if folder.exists():
                                 description_count += len(list(folder.glob("*.json")))
@@ -4439,7 +4758,7 @@ class MainWindow(QMainWindow):
                         )
                         archive_root = project.path / "03_condensed"
                         archive_count = 0
-                        for folder_name in ("mp", "user", "structures"):
+                        for folder_name in ("local", "mp", "user", "structures"):
                             folder = archive_root / folder_name
                             if folder.exists() and any(folder.glob("*.json")):
                                 archive_count += 1
@@ -4608,6 +4927,16 @@ class MainWindow(QMainWindow):
                 self.inspector.set_selection(
                     item_type="工程阶段",
                     name="流程第 3 步：结构匹配与材料分组",
+                    path=str(project.path / directory),
+                    status=status if count == 0 else f"{status} · {count} 项",
+                )
+            elif sid == "12":
+                self.recommendation_report_page.refresh()
+                self.stack.setCurrentWidget(self.recommendation_report_page)
+                self.document_label.setText(f"{project.name} / 综合推荐与结果报告")
+                self.inspector.set_selection(
+                    item_type="结果报告",
+                    name="Stage 12：综合推荐",
                     path=str(project.path / directory),
                     status=status if count == 0 else f"{status} · {count} 项",
                 )
@@ -4900,6 +5229,11 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.structure_match_page)
             return
 
+        if path == ("recommend",):
+            self.recommendation_report_page.refresh()
+            self.stack.setCurrentWidget(self.recommendation_report_page)
+            return
+
         if path in self._pages:
             self.stack.setCurrentWidget(self._pages[path])
             return
@@ -4943,7 +5277,7 @@ class MainWindow(QMainWindow):
         root.mkdir(parents=True, exist_ok=True)
         (root / "logs").mkdir(exist_ok=True)
 
-        backend_kind, backend_activate = self.runtime_backend.currentData()
+        backend_kind, backend_activate, backend_note = self._backend_for_command(argv)
         preview = self._command_preview(argv, backend_kind, backend_activate, root)
         self._current_run = RunRecord(
             started=datetime.now().isoformat(timespec="seconds"),
@@ -4954,9 +5288,14 @@ class MainWindow(QMainWindow):
         self.log.appendPlainText(f"[PROJECT] {project.name}")
         self.log.appendPlainText(f"[TASK] {title}")
         self.log.appendPlainText(f"[CWD] {root}")
+        if backend_note:
+            self.log.appendPlainText(f"[GUI] {backend_note}")
         self.log.appendPlainText(f"[CMD] {preview}")
         self.log.appendPlainText("=" * 90)
         self.bottom_tabs.setCurrentWidget(self.log)
+        self.run_state_label.setText(f"正在计算：{title}")
+        self.run_progress.setVisible(True)
+        self.run_progress.setRange(0, 0)
 
         env = QProcessEnvironment.systemEnvironment()
         key = self.api_key.text().strip()
@@ -4973,6 +5312,32 @@ class MainWindow(QMainWindow):
             args = ["-m", "ssscreen.cli.app", *argv]
         self.process.start(program, args)
         self.statusBar().showMessage(f"{project.name} · 运行中：{title}")
+
+    def _recommended_wsl_activate(self, argv: list[str]) -> str:
+        command_key = tuple(argv[:2])
+        if command_key in MLP_COMMANDS:
+            return WSL_MLP_VENV_ACTIVATE
+        return WSL_VENV_ACTIVATE
+
+    def _backend_for_command(self, argv: list[str]) -> tuple[str, str, str | None]:
+        backend_kind, backend_activate = self.runtime_backend.currentData()
+        if backend_kind == "wsl-auto":
+            selected = self._recommended_wsl_activate(argv)
+            return "wsl", selected, f"Auto backend selected: {selected}"
+
+        command_key = tuple(argv[:2])
+        if (
+            backend_kind == "wsl"
+            and backend_activate == WSL_MLP_VENV_ACTIVATE
+            and command_key == ("stability", "sqs-generate")
+        ):
+            return (
+                "wsl",
+                WSL_VENV_ACTIVATE,
+                "SQS generation uses .venv to read NumPy-2 pickle datasets; MACE stages still use .venv-mlp.",
+            )
+
+        return backend_kind, backend_activate, None
 
     def _command_preview(
         self,
@@ -5044,6 +5409,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("当前没有运行中的任务")
             return
         self.log.appendPlainText("\n[GUI] 正在停止当前任务……")
+        self.run_state_label.setText("正在停止任务…")
         self.process.terminate()
         if not self.process.waitForFinished(2000):
             self.process.kill()
@@ -5088,10 +5454,16 @@ class MainWindow(QMainWindow):
         self.log.moveCursor(QTextCursor.End)
         self.log.insertPlainText(text)
         self.log.moveCursor(QTextCursor.End)
+        if self.process.state() != QProcess.NotRunning:
+            last_line = next((line.strip() for line in reversed(text.splitlines()) if line.strip()), "")
+            if last_line:
+                self.run_state_label.setText(f"正在计算：{_compact_value(last_line, max_len=42)}")
 
     def _finished(self, exit_code: int, _exit_status) -> None:
         self.log.appendPlainText(f"\n[GUI] 任务结束，exit code = {exit_code}")
         self.statusBar().showMessage(f"任务结束 · 退出码 {exit_code}")
+        self.run_progress.setVisible(False)
+        self.run_state_label.setText("完成" if exit_code == 0 else f"结束：退出码 {exit_code}")
 
         finished_command = (
             self._current_run.command
@@ -5111,6 +5483,7 @@ class MainWindow(QMainWindow):
         self.structure_archive_page.refresh_archive()
         self.structure_match_page.refresh_inputs()
         self.structure_match_page.refresh_results()
+        self.recommendation_report_page.refresh()
         self._refresh_file_tree()
         self._rebuild_project_tree()
 
@@ -5146,6 +5519,10 @@ class MainWindow(QMainWindow):
                 self.composition_screen_page.select_section("candidates")
                 self.stack.setCurrentWidget(self.composition_screen_page)
 
+        if exit_code == 0 and " recommend " in f" {finished_command} ":
+            self.recommendation_report_page.refresh()
+            self.stack.setCurrentWidget(self.recommendation_report_page)
+
     def _write_run_audit(self, record: RunRecord) -> None:
         path = self.project_root() / "logs" / "gui_commands.jsonl"
         payload = {
@@ -5164,6 +5541,7 @@ class MainWindow(QMainWindow):
 
     def _process_error(self, error) -> None:
         self.log.appendPlainText(f"\n[GUI] QProcess 错误：{error}")
+        self.run_state_label.setText(f"进程错误：{error}")
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self.process.state() == QProcess.NotRunning:
@@ -5211,6 +5589,21 @@ class MainWindow(QMainWindow):
             #activeProjectLabel {
                 color: #e6e9ec;
                 font-size: 11px;
+            }
+            #runStateLabel {
+                color: #384047;
+                font-size: 10px;
+                min-width: 160px;
+            }
+            #runProgress {
+                min-height: 12px;
+                max-height: 12px;
+                border: 1px solid #a8adb3;
+                background: #eef0f2;
+                text-align: center;
+            }
+            #runProgress::chunk {
+                background: #506d86;
             }
             #toolBar {
                 background: #d7d9dc;
@@ -5352,7 +5745,7 @@ class MainWindow(QMainWindow):
                 padding: 0 3px;
                 color: #384047;
             }
-            QLineEdit, QComboBox, QPlainTextEdit, QTableWidget, QTreeView {
+            QLineEdit, QComboBox, QPlainTextEdit, QTextBrowser, QTableWidget, QTreeView {
                 background: #ffffff;
                 border: 1px solid #adb2b7;
                 border-radius: 1px;
@@ -5363,6 +5756,12 @@ class MainWindow(QMainWindow):
             }
             QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {
                 border-color: #5e7e9b;
+            }
+            #reportViewer {
+                background: #ffffff;
+                color: #202428;
+                font-size: 11px;
+                padding: 8px;
             }
             QPushButton {
                 background: #e7e8ea;

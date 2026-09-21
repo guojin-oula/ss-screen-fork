@@ -83,6 +83,9 @@
   已验证可用于当前项目在线 Materials Project 后端；Stage 11 仍未补跑，离线 `mp_offline` 数据库仍缺。
 - 2026-09-14：新增 `docs/gui_full_pipeline_runbook_2026-09-14.md`，并将 GUI 默认参数调整到
   CaS/CaSe/CaTe 真实 VASP + MACE + MP API 演示链路。
+- 2026-09-15：更新 `docs/real_vasp_mace_pipeline_2026-09-14.md` 和
+  `docs/gui_full_pipeline_runbook_2026-09-14.md`，记录 MP API Stage 11 竞争相凸包已补跑成功：
+  25 个竞争相、hull distance `0.3497941494 eV/atom`、`hull_signal=unstable`。
 - 2026-09-02：项目日志登记当前完整工作树以提交 `33f9cc3` 发布到新远程 `master`；远程 `main`
   保持在原基线，科学路线与下一步 Stage 3 structure-match 不变。
 - 2026-09-02：远程前端保持运行；定位本地页面`Failed to fetch`为远程API进程退出，改用脱离交互

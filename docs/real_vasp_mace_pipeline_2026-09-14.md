@@ -99,8 +99,8 @@ work/real-pbe-mace-20260914-run3
 | Stage 08 | `stability relax` 使用 MACE | 成功，SQS + 2 个端元均 usable |
 | Stage 09 | `stability mixing-enthalpy` | 成功，1 条混合焓 |
 | Stage 10 | `stability phonon-run` 使用 MACE/phonopy | 成功运行，判定 unstable |
-| Stage 11 | `stability phase-diagram` | 未运行；`mp_offline` 仍缺失，但 `data/API Key.txt` 已验证可用于 MP API 后端 |
-| Stage 12 | `recommend` | 成功生成推荐报告，结果 low-priority |
+| Stage 11 | `stability phase-diagram --mp-backend api` | 成功，MP API 竞争相 25 个，凸包判定 unstable |
+| Stage 12 | `recommend` | 成功生成含真实 API hull 证据的推荐报告，结果 low-priority |
 
 ## 4. 带隙结果
 
@@ -249,7 +249,7 @@ imaginary_qpoint_count = 40
 
 ## 9. Phase Diagram / Convex Hull
 
-本轮没有补跑真实 phase-diagram。此前离线模式失败原因：
+此前离线模式失败原因：
 
 ```text
 data/mp_offline.sqlite does not exist
@@ -268,24 +268,62 @@ data/mp_offline.sqlite does not exist
 - 当前 `.venv` 中 `mp_api.client.MPRester` 可导入。
 - 使用该 Key 做过最小 live 查询验证：`CaSe` summary 查询返回 2 条 Materials Project 文档，其中包含 `mp-1008223` 和 `mp-1415`。
 
-结论：
+Key 检查结论：
 
 - 这个 MP API Key 可以用于当前项目的在线 MP 后端。
 - 离线 `mp_offline` SQLite 数据库仍然缺失；如果需要完全离线、可复现的竞争相来源，仍需同事提供数据库。
-- 下一步可在不重跑前面阶段的前提下，仅对当前 `work/real-pbe-mace-20260914-run4/08_relax/relaxation_results.jsonl` 补跑 `stability phase-diagram --mp-backend api`，以生成真实 convex hull 证据。
+- 已基于当前 `work/real-pbe-mace-20260914-run4/08_relax/relaxation_results.jsonl` 补跑 `stability phase-diagram --mp-backend api`，生成真实 convex hull 证据。
 
-为使 Stage 11 推荐器可以如实汇总已有证据，本轮生成了一个明确缺失状态的 phase CSV：
+第一次 API 后端尝试使用默认超时，MP 查询 `Ca-Se-Te` 体系时发生 read timeout，输出保留在：
 
 ```text
-work/real-pbe-mace-20260914-run4/11_phase/phase_stability_missing.csv
+work/real-pbe-mace-20260914-run4/11_phase_api
 ```
 
-该文件不包含伪造 hull 数值，只标记：
+随后使用更长超时并指定单一 thermo 类型重跑成功：
 
 ```text
-status = missing_mp_offline
-usable_for_screening = False
-competing_set_complete = False
+--mp-backend api
+--thermo-type GGA_GGA+U
+--api-timeout 180
+--model-path data/mace-mpa-0-medium.model
+--model-name mace-mpa-0-medium
+--device cuda:0
+--dtype float32
+--fmax 0.03
+--max-steps 200
+--allow-incomplete
+```
+
+输出目录：
+
+```text
+work/real-pbe-mace-20260914-run4/11_phase_api_retry
+```
+
+结果：
+
+| item | value |
+|---|---:|
+| candidate_count | 1 |
+| fetched_entry_count | 25 |
+| unique_entry_count | 25 |
+| competing_manifest_count | 25 |
+| competing_usable_count | 25 |
+| competing_failed_count | 0 |
+| competing_set_complete | True |
+| MP database version | 2026.04.13 |
+| hull distance | 0.3497941494 eV/atom |
+| hull_signal | unstable |
+
+候选相：
+
+```text
+structure_id = sqs-pair-00000-x-0.500000-fb17e0bb32c5
+composition = Ca2TeSe
+chemical_system = Ca-Se-Te
+energy_above_hull_eV_per_atom = 0.3497941494
+decomposition = 0.5 CaSe(mp-1415) + 0.5 CaTe(mp-1519)
 ```
 
 ## 10. Recommendation
@@ -298,17 +336,25 @@ work/real-pbe-mace-20260914-run4/12_recommend/recommendation_report.md
 work/real-pbe-mace-20260914-run4/12_recommend/recommendation_summary.json
 ```
 
+补跑真实 MP API convex hull 后的推荐输出：
+
+```text
+work/real-pbe-mace-20260914-run4/12_recommend_api/recommendations.csv
+work/real-pbe-mace-20260914-run4/12_recommend_api/recommendation_report.md
+work/real-pbe-mace-20260914-run4/12_recommend_api/recommendation_summary.json
+```
+
 结果：
 
 | pair | classification | evidence level | rationale |
 |---|---|---|---|
-| CaSe-CaTe | low-priority | L4 | phonon unstable |
+| CaSe-CaTe | low-priority | L5 | phonon unstable; hull unstable |
 
 推荐器记录：
 
 - 正向证据：`gap:endpoints_verified:pbe-vasp-final-v1`
-- 风险：`mixing:borderline`、`phonon:unstable`、`phonon:nac_not_applied`
-- 缺失：`phase:incomplete_competing_set`、`defects:not_requested`
+- 风险：`mixing:borderline`、`phonon:unstable`、`phonon:nac_not_applied`、`phase:above_low_priority_threshold`
+- 缺失：`defects:not_requested`
 
 ## 11. 当前软件能力结论
 
@@ -320,11 +366,11 @@ work/real-pbe-mace-20260914-run4/12_recommend/recommendation_summary.json
 - 使用同事提供的 MACE 模型在 GPU 上完成 SQS 与端元 relaxation。
 - 基于真实 MACE relaxation 结果计算混合焓。
 - 使用 MACE/phonopy 跑出真实声子谱筛查结果和图像文件。
+- 使用 MP API 获取竞争相，并用同一 MACE 模型完成同能量基准 convex hull 计算。
 - 生成 Stage 11 推荐报告。
 
 当前仍不能完整真实运行：
 
-- 同能量基准竞争相 / convex hull：离线 `mp_offline` 数据库仍缺失；MP API Key 已验证可用，但本文件对应的真实流程尚未补跑 API 后端 phase-diagram。
 - 缺陷计算与缺陷证据。
 
 ## 12. 给同事的下一步材料需求
@@ -333,7 +379,8 @@ work/real-pbe-mace-20260914-run4/12_recommend/recommendation_summary.json
 
 1. 如需离线和可复现运行，提供 `mp_offline` SQLite 数据库；当前 `data/API Key.txt` 已可用于在线 MP API 后端。
 2. 对 CaSe-CaTe 的 phonon 虚频信号做复核：建议更大超胞、更严格 phonon 设置，必要时 DFT phonon 或更高精度验证。
-3. 如果同事有更多 composition / SQS / VASP 结果，按相同 manifest 方式提供，软件可以继续批量校验。
+3. 对 CaSe-CaTe 的 API convex hull 不稳定信号做复核：可用固定 `mp_offline` 快照或 DFT 竞争相能量进行更严格复验。
+4. 如果同事有更多 composition / SQS / VASP 结果，按相同 manifest 方式提供，软件可以继续批量校验。
 
 ## 13. 科学边界
 
@@ -344,4 +391,4 @@ work/real-pbe-mace-20260914-run4/12_recommend/recommendation_summary.json
 - CaTe 的带隙口径存在 `vasprun.xml` 解析小正 gap 与 manifest signed gap 的差异，本轮推荐采用 manifest 口径。
 - CaSe-CaTe 的混合焓略高于 promising 阈值。
 - 声子谱出现明显虚频，因此当前推荐器给出 low-priority。
-- convex hull 证据在本轮报告中仍缺失；虽然 MP API Key 已可用，但需要实际补跑 API 后端 phase-diagram 后，才能声明是否具有同 MACE 能量基准下的竞争相凸包证据。
+- MP API convex hull 已补跑成功，但候选 SQS 高于竞争相凸包约 `0.3498 eV/atom`，因此热力学稳定性证据同样不支持 promising。

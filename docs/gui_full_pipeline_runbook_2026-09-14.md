@@ -333,16 +333,6 @@ Structure Groups：04_groups/groups.json
 
 预期结果：生成 1 对 CaSe-CaTe。
 
-## 4. 切换到 MLP/GPU 后端
-
-从下一步开始，右侧 Properties 改为：
-
-```text
-运行后端：WSL Python / .venv-mlp
-```
-
-MP API Key 可以保持已填写状态。
-
 ### Step 09: 生成 SQS
 
 左侧选择：
@@ -369,6 +359,16 @@ MP API Key 可以保持已填写状态。
 ```text
 运行任务
 ```
+
+## 4. 切换到 MLP/GPU 后端
+
+从下一步开始，右侧 Properties 改为：
+
+```text
+运行后端：WSL Python / .venv-mlp
+```
+
+MP API Key 可以保持已填写状态。
 
 ### Step 10: MACE 结构驰豫
 
@@ -476,6 +476,8 @@ MP API Key：来自 data/API Key.txt
 ```text
 --relax-results：08_relax/relaxation_results.jsonl
 --mp-backend：api
+--thermo-type：GGA_GGA+U
+--api-timeout：180
 --model-path：data/mace-mpa-0-medium.model
 --model-name：mace-mpa-0-medium
 --device：cuda:0
@@ -545,4 +547,3 @@ MP API Key：来自 data/API Key.txt
 3. MACE 模型文件 `data/mace-mpa-0-medium.model` 已接入，SQS、MACE relaxation、混合焓和声子谱可以由 GUI 触发。
 4. MP API Key 已验证可用，因此凸包阶段可以走在线 Materials Project 后端，不再把 `mp_offline` 作为当前演示阻塞项。
 5. 当前 CaSe-CaTe 的科学结论仍要谨慎：此前真实运行中混合焓略高于 promising 阈值，声子有明显虚频；GUI 演示重点是流程打通和证据链可追踪。
-

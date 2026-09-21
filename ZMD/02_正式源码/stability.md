@@ -66,6 +66,8 @@ ss-screen recommend --help
 
 ## 最近同步
 
+- 2026-09-18：`PhononSettings.max_input_force` 默认值由 `0.01` 调整为 `0.02 eV/Angstrom`；CLI 与 GUI
+  的声子任务统一继承该默认值。
 - 2026-08-03：新增 Stage 11 综合推荐模块和顶层命令，输出逐 SQS CSV、Markdown 报告和可选 JSON summary。
 - 2026-08-01：Stage 10 增加显式 `mp_offline` provider，API/离线 manifest 契约统一且来源贯穿最终凸包结果。
 - 2026-07-31：新增 Stage 10 四个竞争相/凸包命令、MP API 结构导出、统一 MACE 能量核验和严格失败语义。

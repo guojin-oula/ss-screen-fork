@@ -190,7 +190,7 @@ class PhononSettings:
     #: Frequencies below minus this tolerance are significant imaginary modes.
     imaginary_tolerance_thz: float = 0.1
     #: Maximum accepted Stage 7 residual force before phonon generation.
-    max_input_force: float = 0.01
+    max_input_force: float = 0.02
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,74 @@
 
 **Read first at the start of every session:** `AGENTS.md` → this file → `PROJECT_PLAN.md`.
 
+## 2026-09-18 — 调整声子输入残余力默认阈值
+
+**本次工作目标：** 将声子流程的 `max-input-force` 默认值从 `0.01` 调整为 `0.02 eV/Angstrom`。
+
+**已完成：**
+- 更新 `src/ssscreen/config.py`：`PhononSettings.max_input_force` 默认值改为 `0.02`，CLI 与 GUI 的声子命令统一继承。
+- 更新 `src/ssscreen/gui/metadata.py`：声子谱一步式运行页面的 `--include-endmembers` 默认勾选。
+- 同步更新 GUI、stability 的 ZMD 导航与版本变更索引。
+
+**决策 / 计划变更：** 仅放宽声子输入结构的残余力准入阈值，不改变虚频判据、位移幅度或 MACE 驰豫参数。
+
+**下一步：** 重启 GUI 后确认声子一步式运行命令预览显示 `--max-input-force 0.02`。
+
+**阻塞项 / 上游问题：** 无。
+
+## 2026-09-17 — 优化 GUI 后段流程与推荐报告展示
+
+**本次工作目标：** 按用户现场演示反馈，简化 GUI 后段命令、修正端元驰豫选项歧义，并增强运行状态与推荐结果可读性。
+
+**已完成：**
+- 更新 `src/ssscreen/gui/metadata.py`：隐藏 Stage 10 的 `phonon-export`、`phonon-forces`、`phonon-collect` 和 Stage 11 的 `competing-export`、`competing-relax`、`convex-hull`，GUI 只保留当前演示使用的一步式 `phonon-run` 与 `phase-diagram`。
+- 更新 `src/ssscreen/gui/app.py`：布尔选项不再显示 `--include-endmembers / --no-include-endmembers` 双选项标签；`--include-endmembers` preset 默认勾选并会正确写入命令。
+- 新增 Stage 12 结果报告页：读取 `12_recommend/recommendation_report.md` 进行 Markdown 预览，并把 `recommendations.csv` 与 `06_pair`、`07_sqs`、`09_mixing`、`10_phonon`、`11_phase` 关键证据合并成候选表，展示材料对、结构文件、gap、混合焓、声子、凸包、风险和下一步建议。
+- 工具栏新增运行状态文本和不确定进度条；任务运行时显示正在计算和最新输出摘要，结束后隐藏进度条。
+
+**决策 / 计划变更：**
+- GUI 面向当前整套演示流程隐藏拆分调试命令；CLI 仍保留这些命令供开发或排错使用。
+
+**下一步：** 重启 PyCharm GUI 后，从 Stage 08 起默认端元驰豫会勾选；Stage 12 可直接查看 Markdown 报告和合并证据表。
+
+**阻塞项 / 上游问题：** 本次未改变科学算法，未运行 DFT、AiiDA 或 notebook。
+
+## 2026-09-16 — 修正 GUI 阶段默认路径归一化
+
+**本次工作目标：** 解决 GUI 中结构匹配等阶段仍可能带入 `src/ssscreen/gui/...` 旧子目录路径，导致后端找不到阶段产物的问题。
+
+**已完成：**
+- 更新 `src/ssscreen/gui/app.py`：新增工程路径显示/解析归一化，若界面残留 `src/ssscreen/gui/01_dataset`、`03_condensed` 等旧路径，会自动折回项目根目录下的 `01_dataset`、`03_condensed`。
+- 结构匹配页的默认归档路径和旧路径追加场景均验证为 `03_condensed/local`；从 `src/ssscreen/gui` 启动 GUI 时活动工程仍识别为仓库根目录。
+- 左侧工程树 Stage 03/04 状态统计补充 `03_condensed/local`，避免本地结构归档已经生成但界面仍显示未准备。
+- 运行后端新增 WSL 自动选择模式：前中段和 SQS 默认使用 `.venv`，MACE relax、phonon 和 phase-diagram 使用 `.venv-mlp`；若误选 `.venv-mlp` 运行 SQS，GUI 会自动改用 `.venv`，避免 NumPy 2 pickle 在 NumPy 1.26 MACE 环境中读取失败。
+- 已用 `.venv` 复跑 `stability sqs-generate`，输出 `SQS input summary: written=1 skipped=0 manifest=07_sqs/sqs_manifest.jsonl`。
+
+**决策 / 计划变更：**
+- 无科学流程变化；本次只修正 GUI 层路径展示、解析和状态统计。
+
+**下一步：** 重启 PyCharm 中的 GUI 后，右侧运行后端保持默认“WSL Python / 自动选择”；从 Stage 08 MACE 驰豫开始会自动切到 `.venv-mlp`。
+
+**阻塞项 / 上游问题：** WSL 启动时仍会打印非致命 localhost/NAT 编码警告；本次未运行 MACE、phonon、MP API 或 DFT。
+
+## 2026-09-15 — 补跑 MP API 竞争相凸包
+
+**本次工作目标：** 在不重跑前面阶段的前提下，基于已有 MACE relaxation 结果补跑 Stage 11 在线 MP API 竞争相与同 MACE 能量基准 convex hull。
+
+**已完成：**
+- 第一次使用默认 API 超时输出到 `work/real-pbe-mace-20260914-run4/11_phase_api/`，MP 查询 `Ca-Se-Te` 体系 read timeout，结果为 `missing_elemental_reference`，未得到可用 hull。
+- 第二次使用 `--thermo-type GGA_GGA+U --api-timeout 180` 输出到 `work/real-pbe-mace-20260914-run4/11_phase_api_retry/`，MP API 查询成功，获取 25 个竞争相，25 个竞争相 MACE relaxation 均可用。
+- 得到真实 `phase_stability.csv`：CaSe-CaTe SQS 的同 MACE 能量基准 hull distance 为 `0.3497941494 eV/atom`，`hull_signal=unstable`，`competing_set_complete=True`，MP database version 为 `2026.04.13`。
+- 使用真实 API hull 证据重新生成 `work/real-pbe-mace-20260914-run4/12_recommend_api/` 推荐报告，结果仍为 `low-priority`，证据等级提升为 L5，风险包含 `phase:above_low_priority_threshold`。
+- 更新 `docs/real_vasp_mace_pipeline_2026-09-14.md` 和 `docs/gui_full_pipeline_runbook_2026-09-14.md`；GUI Stage 11 默认参数补充 `--thermo-type GGA_GGA+U --api-timeout 180`。
+
+**决策 / 计划变更：**
+- 当前演示链路不再把 `mp_offline` 作为硬阻塞；在线 MP API 已能补齐真实竞争相凸包证据。离线数据库只作为后续可复现/批量运行优化。
+
+**下一步：** 从 GUI 按全流程操作单复跑时，Stage 11 使用 `.venv-mlp`、MP API Key、`GGA_GGA+U` 和 180 秒 API timeout；汇报时说明 CaSe-CaTe 目前同时有 phonon unstable 和 hull unstable 两个负向信号。
+
+**阻塞项 / 上游问题：** Stage 11 在线结果依赖 Materials Project 当前数据库和网络状态；未运行 DFT 或 AiiDA。缺陷证据仍未接入。
+
 ## 2026-09-14 — 调整 GUI 默认参数并生成全流程操作单
 
 **本次工作目标：** 将 GUI 默认选项调整为当前 CaS/CaSe/CaTe 真实 VASP + MACE + MP API 演示链路可直接使用的参数，并生成逐步操作 Markdown。
