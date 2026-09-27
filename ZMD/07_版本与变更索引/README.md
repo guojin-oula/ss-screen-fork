@@ -64,6 +64,33 @@
 
 ## 同步记录
 
+### 2026-09-28 — 修正结果表格与 MatterViz 布局
+
+- 真实变更：Stage 11 表格改用填充式列宽，新增 28 条相记录计数，角色、目标标志和凸包距离使用中文/格式化显示。
+- 真实变更：Stage 10 晶体视图从右侧半栏移到完整 MatterViz 标签页；Stage 10/11 WebEngine 视图使用扩展尺寸，
+  内嵌前端的根容器与 canvas 同步填满可用空间。
+- 验证：真实结果读取到竞争相 28 行、声子 3 行；1280×760 页面下两个 MatterViz 视图均为约 1256×691；
+  Ruff、`py_compile`、2 项 `.ssproject` 测试和 MatterViz production build 通过。
+
+### 2026-09-27 — 忽略 MatterViz npm 依赖目录
+
+- 忽略规则：新增 `/gui-matterviz/node_modules/`，排除约 162 MB 的可重装 npm 依赖和 Vite 缓存。
+- 保留范围：`gui-matterviz/src/`、`public/`、`package.json`、`package-lock.json` 及构建配置仍纳入版本管理，
+  确保内嵌 MatterViz 可维护、可审计和可复现构建。
+
+### 2026-09-27 — 集成桌面结果可视化与单文件项目
+
+- 真实变更：GUI 新增 MatterViz 晶体浏览、声子 band/DOS/状态页、竞争相表格与三元组成图；MACE 默认
+  设备改为 CPU，CLI 选项增加中文标签，SSH 增加只读环境探测且不提交远端作业。
+- 真实变更：新增 `.ssproject` ZIP64 容器，保存 Stage 01--12、流程选择和 SHA-256 清单并安全回读；
+  MP API Key 不进入项目文件。真实 01--12 算例打包为 187 个制品，原始 1,038,559 bytes，容器
+  409,144 bytes，校验回读通过。
+- 前端变更：新增 `gui-matterviz/` Svelte 构建工程和随 Python wheel 分发的 MatterViz 0.7.0 静态资源；
+  高级控制面板因上游 `svelte-widgets` 初始化错误关闭，核心 WebGL 渲染与交互保留。
+- 验证：核心 174 项 pytest、目标 Ruff、MatterViz production build 和 wheel 资源检查通过；真实浏览器
+  可视验收确认 CaSe 晶胞非空并显示元素图例/复制控件。当前 WSL OpenSSH 可用，但尚无服务器账号，
+  因而只验证了本地探测能力和命令边界。
+
 ### 2026-09-18 — 调整声子输入残余力默认阈值
 
 - 真实变更：`src/ssscreen/config.py` 将 `PhononSettings.max_input_force` 从 `0.01` 调整为

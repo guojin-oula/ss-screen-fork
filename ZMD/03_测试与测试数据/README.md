@@ -2,7 +2,7 @@
 
 真实目录：[`tests/`](../../tests/)、[`web/backend/tests/`](../../web/backend/tests/) 和 [`web/frontend/tests/`](../../web/frontend/tests/)
 
-当前有 22 个 Python 测试文件（含 `conftest.py`）；参数化展开后完整测试为 172 项。
+当前有 23 个 Python 测试文件（含 `conftest.py`）；参数化展开后完整测试为 174 项。
 Web 基线另有 54 项后端 pytest、1 项 Vitest 和 20 项 Playwright 四宽度测试。
 
 ## 测试文件映射
@@ -31,6 +31,7 @@ Web 基线另有 54 项后端 pytest、1 项 Vitest 和 20 项 Playwright 四宽
 | [`test_e2e_pipeline.py`](../../tests/test_e2e_pipeline.py) | Stage 1--11 轻量 CLI 文件链、跨阶段 ID/schema、确定性替身和双运行复现 |
 | [`test_reference_curation.py`](../../tests/test_reference_curation.py) | 历史资料发现、脱敏、别名、manifest 和 tamper 检测 |
 | [`test_project_config.py`](../../tests/test_project_config.py) | 开发依赖和 CI 配置约束 |
+| [`test_gui_project_file.py`](../../tests/test_gui_project_file.py) | `.ssproject` 01--12 打包回读、元数据保持和 SHA-256 篡改检测 |
 
 ## Web 测试映射
 
@@ -69,6 +70,8 @@ npm --prefix web/frontend run test:e2e
 
 ## 最近同步
 
+- 2026-09-27：新增 2 项 `.ssproject` 容器测试；核心完整套件为 174 项，并通过 GUI Ruff、MatterViz
+  生产构建、真实 187 制品项目回读和 wheel 静态资源包含性检查。
 - 2026-09-02：远程发布前重新运行核心172项pytest、Ruff、Black，Web后端54项pytest/Ruff/Black，
   以及前端ESLint、Vitest 1项、TypeScript typecheck和生产构建；全部通过。未重跑需要浏览器与
   运行中服务的Playwright，沿用同日最近一次20项通过记录。

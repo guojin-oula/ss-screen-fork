@@ -11,7 +11,9 @@ GUI.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
+import os
 import shlex
 import sys
 from dataclasses import dataclass
@@ -50,17 +52,17 @@ try:
         QTableWidget,
         QTableWidgetItem,
         QTabWidget,
+        QTextBrowser,
         QTreeView,
         QTreeWidget,
-        QTextBrowser,
         QTreeWidgetItem,
         QVBoxLayout,
         QWidget,
     )
 except ImportError as exc:  # pragma: no cover - exercised only without GUI extra
     raise RuntimeError(
-        "SS-Screen GUI requires PySide6. Install it with `pip install -e \".[gui]\"` "
-        "or `pip install \"ss-screen[gui]\"`."
+        'SS-Screen GUI requires PySide6. Install it with `pip install -e ".[gui]"` '
+        'or `pip install "ss-screen[gui]"`.'
     ) from exc
 
 if __package__ in {None, ""}:
@@ -69,11 +71,25 @@ if __package__ in {None, ""}:
         sys.path.insert(0, str(src_root))
     from ssscreen import __version__
     from ssscreen.cli.app import cli
-    from ssscreen.gui.metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation
+    from ssscreen.gui.metadata import (
+        COMMANDS,
+        PATH_PRESETS,
+        STAGES,
+        CommandPresentation,
+        option_label_zh,
+    )
+    from ssscreen.gui.project_file import (
+        create_project_file,
+        extract_project_file,
+        inspect_project_file,
+    )
+    from ssscreen.gui.visualization import PhaseResultsPage, PhononResultsPage, StructureResultsPage
 else:
     from .. import __version__
     from ..cli.app import cli
-    from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation
+    from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation, option_label_zh
+    from .project_file import create_project_file, extract_project_file, inspect_project_file
+    from .visualization import PhaseResultsPage, PhononResultsPage, StructureResultsPage
 
 
 APP_TITLE = f"SS-Screen V{__version__} · Materials Engineering Workbench"
@@ -104,10 +120,7 @@ def _find_project_root(path: Path) -> Path:
         if (
             (candidate / ".ssscreen-project.json").exists()
             or (candidate / ".git").exists()
-            or (
-                pyproject.exists()
-                and (candidate / "src" / "ssscreen").exists()
-            )
+            or (pyproject.exists() and (candidate / "src" / "ssscreen").exists())
         ):
             return candidate
     return current
@@ -117,7 +130,7 @@ def _strip_gui_package_prefix(value: str) -> str:
     normalized = value.replace("\\", "/")
     prefix = "/".join(GUI_PACKAGE_RELATIVE_ROOT) + "/"
     if normalized.startswith(prefix):
-        remainder = normalized[len(prefix):]
+        remainder = normalized[len(prefix) :]
         if remainder.split("/", 1)[0] in PROJECT_DIRS:
             return remainder
     return normalized
@@ -406,9 +419,8 @@ class CommandPage(QWidget):
             editor.changed.connect(self.refresh_preview)
             self.editors.append((param, editor))
 
-            flag_text = param.opts[0] if param.opts else param.name
-            if param.secondary_opts and not param.is_bool_flag:
-                flag_text += " / " + param.secondary_opts[0]
+            cli_flag = param.opts[0] if param.opts else param.name
+            flag_text = f"{option_label_zh(param.name)}  ({cli_flag})"
             if param.required:
                 flag_text += "  *"
             label = QLabel(flag_text)
@@ -509,10 +521,6 @@ class CommandPage(QWidget):
         self.run_requested.emit(argv, self.presentation.title)
 
 
-
-
-
-
 def _wrap_in_scroll_area(
     content: QWidget,
     *,
@@ -535,8 +543,6 @@ def _wrap_in_scroll_area(
     scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
     scroll.setWidget(content)
     return scroll
-
-
 
 
 class DatasetSourcePage(QWidget):
@@ -689,13 +695,11 @@ class DatasetSourcePage(QWidget):
 
         source_type = QLabel("External materials database / 外部材料数据库")
         source_use = QLabel(
-            "用于获取初始材料结构与筛选所需数据库字段，"
-            "获取后统一保存为项目内的 01_dataset/mp.df。"
+            "用于获取初始材料结构与筛选所需数据库字段，获取后统一保存为项目内的 01_dataset/mp.df。"
         )
         source_use.setWordWrap(True)
         source_flow = QLabel(
-            "Materials Project → SS-Screen 数据获取/规范化 → "
-            "01_dataset/mp.df → 组成模板筛选"
+            "Materials Project → SS-Screen 数据获取/规范化 → 01_dataset/mp.df → 组成模板筛选"
         )
         source_flow.setWordWrap(True)
 
@@ -770,9 +774,7 @@ class DatasetSourcePage(QWidget):
         refresh.clicked.connect(self.refresh_sources)
         copy = QPushButton("复制命令")
         copy.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                self.mp_preview.toPlainText()
-            )
+            lambda: QApplication.clipboard().setText(self.mp_preview.toPlainText())
         )
         run = QPushButton("获取 Materials Project 数据")
         run.setObjectName("primaryButton")
@@ -784,9 +786,7 @@ class DatasetSourcePage(QWidget):
         layout.addLayout(actions)
         layout.addStretch(1)
 
-        self.mp_backend.currentIndexChanged.connect(
-            self._mp_backend_changed
-        )
+        self.mp_backend.currentIndexChanged.connect(self._mp_backend_changed)
         for editor in (
             self.mp_offline_db,
             self.mp_max_e_hull,
@@ -810,30 +810,29 @@ class DatasetSourcePage(QWidget):
             "--backend",
             str(self.mp_backend.currentData()),
         ]
-        if (
-            self.mp_backend.currentData() == "offline"
-            and self.mp_offline_db.text().strip()
-        ):
-            argv.extend([
-                "--offline-db",
-                self.mp_offline_db.text().strip(),
-            ])
+        if self.mp_backend.currentData() == "offline" and self.mp_offline_db.text().strip():
+            argv.extend(
+                [
+                    "--offline-db",
+                    self.mp_offline_db.text().strip(),
+                ]
+            )
 
-        argv.extend([
-            "--max-e-hull",
-            self.mp_max_e_hull.text().strip() or "0.01",
-            "--output",
-            self.mp_output.text().strip(),
-            "--provenance",
-            self.mp_provenance.text().strip(),
-        ])
+        argv.extend(
+            [
+                "--max-e-hull",
+                self.mp_max_e_hull.text().strip() or "0.01",
+                "--output",
+                self.mp_output.text().strip(),
+                "--provenance",
+                self.mp_provenance.text().strip(),
+            ]
+        )
         return argv
 
     def _refresh_mp_preview(self) -> None:
         if hasattr(self, "mp_preview"):
-            self.mp_preview.setPlainText(
-                shlex.join(["ss-screen", *self._mp_argv()])
-            )
+            self.mp_preview.setPlainText(shlex.join(["ss-screen", *self._mp_argv()]))
 
     def _run_mp(self) -> None:
         if not self.mp_output.text().strip():
@@ -843,10 +842,7 @@ class DatasetSourcePage(QWidget):
                 "请设置 Materials Project 本地 DataFrame 输出路径。",
             )
             return
-        if (
-            self.mp_backend.currentData() == "offline"
-            and not self.mp_offline_db.text().strip()
-        ):
+        if self.mp_backend.currentData() == "offline" and not self.mp_offline_db.text().strip():
             QMessageBox.warning(
                 self,
                 "缺少离线数据库",
@@ -930,9 +926,7 @@ class DatasetSourcePage(QWidget):
         refresh.clicked.connect(self.refresh_sources)
         copy = QPushButton("复制命令")
         copy.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                self.wbm_preview.toPlainText()
-            )
+            lambda: QApplication.clipboard().setText(self.wbm_preview.toPlainText())
         )
         run = QPushButton("获取 WBM 数据")
         run.setObjectName("primaryButton")
@@ -964,9 +958,7 @@ class DatasetSourcePage(QWidget):
 
     def _refresh_wbm_preview(self) -> None:
         if hasattr(self, "wbm_preview"):
-            self.wbm_preview.setPlainText(
-                shlex.join(["ss-screen", *self._wbm_argv()])
-            )
+            self.wbm_preview.setPlainText(shlex.join(["ss-screen", *self._wbm_argv()]))
 
     def _run_wbm(self) -> None:
         if not self.wbm_xyz.text().strip():
@@ -1065,9 +1057,7 @@ class DatasetSourcePage(QWidget):
         refresh.clicked.connect(self.refresh_sources)
         copy = QPushButton("复制命令")
         copy.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                self.structures_preview.toPlainText()
-            )
+            lambda: QApplication.clipboard().setText(self.structures_preview.toPlainText())
         )
         run = QPushButton("导入本地结构")
         run.setObjectName("primaryButton")
@@ -1157,16 +1147,12 @@ class DatasetSourcePage(QWidget):
         local_layout.addWidget(self.local_table)
         layout.addWidget(local_box)
 
-        provenance_box = QGroupBox(
-            "Materials Project Provenance / 来源记录"
-        )
+        provenance_box = QGroupBox("Materials Project Provenance / 来源记录")
         provenance_layout = QVBoxLayout(provenance_box)
         self.provenance_table = QTableWidget(0, 2)
         self.provenance_table.setHorizontalHeaderLabels(["字段", "值"])
         self.provenance_table.verticalHeader().setVisible(False)
-        self.provenance_table.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )
+        self.provenance_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.provenance_table.horizontalHeader().setStretchLastSection(True)
         self.provenance_table.setMinimumHeight(220)
         provenance_layout.addWidget(self.provenance_table)
@@ -1204,9 +1190,7 @@ class DatasetSourcePage(QWidget):
         provenance_path = self._resolve(self.mp_provenance.text())
 
         self.mp_status.setText(
-            "Ready · " + self._display_path(mp_path)
-            if mp_path.exists()
-            else "未生成"
+            "Ready · " + self._display_path(mp_path) if mp_path.exists() else "未生成"
         )
         self.mp_size.setText(self._format_size(mp_path))
         self.mp_provenance_status.setText(
@@ -1215,9 +1199,7 @@ class DatasetSourcePage(QWidget):
             else "未生成"
         )
         self.wbm_status.setText(
-            "Ready · " + self._display_path(wbm_path)
-            if wbm_path.exists()
-            else "未生成"
+            "Ready · " + self._display_path(wbm_path) if wbm_path.exists() else "未生成"
         )
         self.wbm_size.setText(self._format_size(wbm_path))
 
@@ -1319,7 +1301,6 @@ class DatasetSourcePage(QWidget):
         else:
             self.tabs.setCurrentIndex(3)
         self.refresh_sources()
-
 
 
 class CompositionScreenPage(QWidget):
@@ -1592,9 +1573,7 @@ class CompositionScreenPage(QWidget):
         refresh_button.clicked.connect(self._refresh_preview)
         copy_button = QPushButton("复制命令")
         copy_button.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                self.command_preview.toPlainText()
-            )
+            lambda: QApplication.clipboard().setText(self.command_preview.toPlainText())
         )
         run_button = QPushButton("开始组成模板筛选")
         run_button.setObjectName("primaryButton")
@@ -1667,9 +1646,7 @@ class CompositionScreenPage(QWidget):
             "01_dataset/wbm.df",
             "01_dataset/local_structures.df",
         ]
-        existing = [
-            value for value in defaults if (self._project_root() / value).exists()
-        ]
+        existing = [value for value in defaults if (self._project_root() / value).exists()]
         for value in existing:
             self._append_dataframe(value)
         if not initial:
@@ -1781,29 +1758,38 @@ class CompositionScreenPage(QWidget):
         if self.use_valence.isChecked() and self.valence_edit.text().strip():
             argv.extend(["--valence-ids", self.valence_edit.text().strip()])
 
-        argv.extend([
-            "--nelems", self.nelems_edit.text().strip() or "2",
-            "--max-bandgap", self.max_bandgap_edit.text().strip() or "1.0",
-            "--max-e-hull", self.max_e_hull_edit.text().strip() or "0.01",
-            "--min-group-size", self.min_group_size_edit.text().strip() or "2",
-            "--min-x-elements", self.min_x_elements_edit.text().strip() or "2",
-            "--output", self.candidates_output.text().strip().replace("\\", "/"),
-            "--summary", self.summary_output.text().strip().replace("\\", "/"),
-        ])
+        argv.extend(
+            [
+                "--nelems",
+                self.nelems_edit.text().strip() or "2",
+                "--max-bandgap",
+                self.max_bandgap_edit.text().strip() or "1.0",
+                "--max-e-hull",
+                self.max_e_hull_edit.text().strip() or "0.01",
+                "--min-group-size",
+                self.min_group_size_edit.text().strip() or "2",
+                "--min-x-elements",
+                self.min_x_elements_edit.text().strip() or "2",
+                "--output",
+                self.candidates_output.text().strip().replace("\\", "/"),
+                "--summary",
+                self.summary_output.text().strip().replace("\\", "/"),
+            ]
+        )
         return argv
 
     def _refresh_preview(self) -> None:
         if hasattr(self, "command_preview"):
-            self.command_preview.setPlainText(
-                shlex.join(["ss-screen", *self._screen_argv()])
-            )
+            self.command_preview.setPlainText(shlex.join(["ss-screen", *self._screen_argv()]))
 
     def _run_screen(self) -> None:
-        if not self._check_required([
-            ("规范化 DataFrame", ", ".join(self._dataframe_paths())),
-            ("候选材料表输出", self.candidates_output.text()),
-            ("筛选统计输出", self.summary_output.text()),
-        ]):
+        if not self._check_required(
+            [
+                ("规范化 DataFrame", ", ".join(self._dataframe_paths())),
+                ("候选材料表输出", self.candidates_output.text()),
+                ("筛选统计输出", self.summary_output.text()),
+            ]
+        ):
             return
 
         # Basic GUI-side type checks; final validation still belongs to Click.
@@ -1822,8 +1808,7 @@ class CompositionScreenPage(QWidget):
             QMessageBox.warning(
                 self,
                 "筛选参数错误",
-                "元素数、组大小和 X 元素数量必须为正整数；"
-                "带隙和凸包距离必须为非负数字。",
+                "元素数、组大小和 X 元素数量必须为正整数；带隙和凸包距离必须为非负数字。",
             )
             return
 
@@ -1892,9 +1877,7 @@ class CompositionScreenPage(QWidget):
         condition_form.addRow("价态过滤", self.result_valence)
         layout.addWidget(condition_box)
 
-        candidates_box = QGroupBox(
-            "Composition Candidates / 候选材料表"
-        )
+        candidates_box = QGroupBox("Composition Candidates / 候选材料表")
         candidates_layout = QVBoxLayout(candidates_box)
 
         filter_row = QHBoxLayout()
@@ -1906,12 +1889,8 @@ class CompositionScreenPage(QWidget):
         self.template_filter.addItem("全部模板")
         self.candidate_count_label = QLabel("0 条")
 
-        self.candidate_search.textChanged.connect(
-            self._apply_candidate_filter
-        )
-        self.template_filter.currentTextChanged.connect(
-            self._apply_candidate_filter
-        )
+        self.candidate_search.textChanged.connect(self._apply_candidate_filter)
+        self.template_filter.currentTextChanged.connect(self._apply_candidate_filter)
 
         filter_row.addWidget(QLabel("搜索"))
         filter_row.addWidget(self.candidate_search, 1)
@@ -1922,27 +1901,19 @@ class CompositionScreenPage(QWidget):
 
         self.candidates_table = QTableWidget(0, 0)
         self.candidates_table.verticalHeader().setVisible(False)
-        self.candidates_table.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )
-        self.candidates_table.setSelectionBehavior(
-            QAbstractItemView.SelectRows
-        )
+        self.candidates_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.candidates_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.candidates_table.setSortingEnabled(False)
         self.candidates_table.setMinimumHeight(275)
         candidates_layout.addWidget(self.candidates_table)
         layout.addWidget(candidates_box, 1)
 
-        raw_summary_box = QGroupBox(
-            "Summary JSON Fields / 原始统计字段"
-        )
+        raw_summary_box = QGroupBox("Summary JSON Fields / 原始统计字段")
         raw_summary_layout = QVBoxLayout(raw_summary_box)
         self.summary_table = QTableWidget(0, 2)
         self.summary_table.setHorizontalHeaderLabels(["字段", "值"])
         self.summary_table.verticalHeader().setVisible(False)
-        self.summary_table.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )
+        self.summary_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.summary_table.horizontalHeader().setStretchLastSection(True)
         self.summary_table.setMaximumHeight(190)
         raw_summary_layout.addWidget(self.summary_table)
@@ -2020,12 +1991,8 @@ class CompositionScreenPage(QWidget):
         if not hasattr(self, "candidates_table"):
             return
 
-        candidate_path = self._resolve(
-            self.candidates_output.text()
-        )
-        summary_path = self._resolve(
-            self.summary_output.text()
-        )
+        candidate_path = self._resolve(self.candidates_output.text())
+        summary_path = self._resolve(self.summary_output.text())
 
         self.candidates_file_state.setText(
             self._display_path(candidate_path)
@@ -2081,9 +2048,7 @@ class CompositionScreenPage(QWidget):
 
         # Show the actual recorded conditions when summary contains them;
         # otherwise show current GUI settings and mark no extra conclusions.
-        self.result_nelems.setText(
-            str(summary.get("nelems", self.nelems_edit.text()))
-        )
+        self.result_nelems.setText(str(summary.get("nelems", self.nelems_edit.text())))
         self.result_max_bandgap.setText(
             str(
                 summary.get(
@@ -2123,9 +2088,7 @@ class CompositionScreenPage(QWidget):
         if "valence_ids" in summary:
             self.result_valence.setText(str(summary["valence_ids"]))
         elif self.use_valence.isChecked():
-            self.result_valence.setText(
-                "使用：" + self._display_path(valence_path)
-            )
+            self.result_valence.setText("使用：" + self._display_path(valence_path))
         else:
             self.result_valence.setText("未使用")
 
@@ -2199,20 +2162,11 @@ class CompositionScreenPage(QWidget):
         for row_index, record in enumerate(self._candidate_records):
             text_match = True
             if query:
-                text_match = any(
-                    query in str(value).lower()
-                    for value in record.values()
-                )
+                text_match = any(query in str(value).lower() for value in record.values())
 
             template_match = True
-            if (
-                template != "全部模板"
-                and self._template_field is not None
-            ):
-                template_match = (
-                    str(record.get(self._template_field, "")).strip()
-                    == template
-                )
+            if template != "全部模板" and self._template_field is not None:
+                template_match = str(record.get(self._template_field, "")).strip() == template
 
             show = text_match and template_match
             self.candidates_table.setRowHidden(
@@ -2226,16 +2180,12 @@ class CompositionScreenPage(QWidget):
         if visible == total:
             self.candidate_count_label.setText(f"{total} 条")
         else:
-            self.candidate_count_label.setText(
-                f"{visible} / {total} 条"
-            )
+            self.candidate_count_label.setText(f"{visible} / {total} 条")
 
     def _open_candidates_file(self) -> None:
         path = self._resolve(self.candidates_output.text())
         if path.exists():
-            QDesktopServices.openUrl(
-                QUrl.fromLocalFile(str(path))
-            )
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         else:
             QMessageBox.information(
                 self,
@@ -2246,9 +2196,7 @@ class CompositionScreenPage(QWidget):
     def _open_summary_file(self) -> None:
         path = self._resolve(self.summary_output.text())
         if path.exists():
-            QDesktopServices.openUrl(
-                QUrl.fromLocalFile(str(path))
-            )
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         else:
             QMessageBox.information(
                 self,
@@ -2263,7 +2211,6 @@ class CompositionScreenPage(QWidget):
         else:
             self.tabs.setCurrentIndex(1)
             self.refresh_results()
-
 
 
 class StructureArchivePage(QWidget):
@@ -2427,7 +2374,9 @@ class StructureArchivePage(QWidget):
 
         host, self.df_output_dir = self._path_editor("03_condensed/local", directory=True)
         out_form.addRow("结构描述目录", host)
-        host, self.df_manifest = self._path_editor("03_condensed/local_manifest.jsonl", save_file=True)
+        host, self.df_manifest = self._path_editor(
+            "03_condensed/local_manifest.jsonl", save_file=True
+        )
         out_form.addRow("Manifest", host)
         host, self.df_index = self._path_editor("03_condensed/local_index.csv", save_file=True)
         out_form.addRow("Index", host)
@@ -2487,11 +2436,16 @@ class StructureArchivePage(QWidget):
     def _df_argv(self, override_limit: int | None = None) -> list[str]:
         argv = [
             "condense",
-            "--df", self.df_path.text().strip(),
-            "--structure-column", self.structure_column.text().strip() or "structure",
-            "--output-dir", self.df_output_dir.text().strip(),
-            "--manifest", self.df_manifest.text().strip(),
-            "--index", self.df_index.text().strip(),
+            "--df",
+            self.df_path.text().strip(),
+            "--structure-column",
+            self.structure_column.text().strip() or "structure",
+            "--output-dir",
+            self.df_output_dir.text().strip(),
+            "--manifest",
+            self.df_manifest.text().strip(),
+            "--index",
+            self.df_index.text().strip(),
         ]
         if self.use_material_id.isChecked() and self.material_id_column.text().strip():
             argv.extend(["--material-id-column", self.material_id_column.text().strip()])
@@ -2507,12 +2461,14 @@ class StructureArchivePage(QWidget):
             self.df_preview.setPlainText(shlex.join(["ss-screen", *self._df_argv()]))
 
     def _run_dataframe(self, checked: bool = False, test_limit: int | None = None) -> None:
-        if not self._check_required([
-            ("DataFrame", self.df_path),
-            ("结构描述目录", self.df_output_dir),
-            ("Manifest", self.df_manifest),
-            ("Index", self.df_index),
-        ]):
+        if not self._check_required(
+            [
+                ("DataFrame", self.df_path),
+                ("结构描述目录", self.df_output_dir),
+                ("Manifest", self.df_manifest),
+                ("Index", self.df_index),
+            ]
+        ):
             return
         argv = self._df_argv(override_limit=test_limit)
         title = "结构描述归档 · DataFrame"
@@ -2578,7 +2534,9 @@ class StructureArchivePage(QWidget):
 
         host, self.files_output_dir = self._path_editor("03_condensed/local", directory=True)
         out_form.addRow("结构描述目录", host)
-        host, self.files_manifest = self._path_editor("03_condensed/local_manifest.jsonl", save_file=True)
+        host, self.files_manifest = self._path_editor(
+            "03_condensed/local_manifest.jsonl", save_file=True
+        )
         out_form.addRow("Manifest", host)
         host, self.files_index = self._path_editor("03_condensed/local_index.csv", save_file=True)
         out_form.addRow("Index", host)
@@ -2676,7 +2634,9 @@ class StructureArchivePage(QWidget):
         for path in sorted(folder.rglob("*")):
             if not path.is_file():
                 continue
-            if path.suffix.lower() in supported or path.name.upper().startswith(("POSCAR", "CONTCAR")):
+            if path.suffix.lower() in supported or path.name.upper().startswith(
+                ("POSCAR", "CONTCAR")
+            ):
                 self._append_structure_file(path)
 
     def _remove_structure_files(self) -> None:
@@ -2696,11 +2656,16 @@ class StructureArchivePage(QWidget):
         argv = ["condense"]
         for value in self._structure_file_rows():
             argv.extend(["--input", value])
-        argv.extend([
-            "--output-dir", self.files_output_dir.text().strip(),
-            "--manifest", self.files_manifest.text().strip(),
-            "--index", self.files_index.text().strip(),
-        ])
+        argv.extend(
+            [
+                "--output-dir",
+                self.files_output_dir.text().strip(),
+                "--manifest",
+                self.files_manifest.text().strip(),
+                "--index",
+                self.files_index.text().strip(),
+            ]
+        )
         if self.files_stop_on_error.isChecked():
             argv.append("--stop-on-error")
         return argv
@@ -2717,11 +2682,13 @@ class StructureArchivePage(QWidget):
                 "请先添加至少一个 CIF、POSCAR 或其他晶体结构文件。",
             )
             return
-        if not self._check_required([
-            ("结构描述目录", self.files_output_dir),
-            ("Manifest", self.files_manifest),
-            ("Index", self.files_index),
-        ]):
+        if not self._check_required(
+            [
+                ("结构描述目录", self.files_output_dir),
+                ("Manifest", self.files_manifest),
+                ("Index", self.files_index),
+            ]
+        ):
             return
         self.run_requested.emit(self._files_argv(), "结构描述归档 · 结构文件")
 
@@ -2768,9 +2735,13 @@ class StructureArchivePage(QWidget):
 
         host, self.archive_dir_edit = self._path_editor("03_condensed/local", directory=True)
         tools.addRow("归档目录", host)
-        host, self.archive_index_output = self._path_editor("03_condensed/local_index.csv", save_file=True)
+        host, self.archive_index_output = self._path_editor(
+            "03_condensed/local_index.csv", save_file=True
+        )
         tools.addRow("索引输出", host)
-        host, self.archive_validation_output = self._path_editor("03_condensed/local_validation.csv", save_file=True)
+        host, self.archive_validation_output = self._path_editor(
+            "03_condensed/local_validation.csv", save_file=True
+        )
         tools.addRow("校验输出", host)
         layout.addWidget(tools_box)
 
@@ -2830,7 +2801,9 @@ class StructureArchivePage(QWidget):
             "未生成" if not indexes else "已生成：" + ", ".join(path.name for path in indexes)
         )
         self.validation_state.setText(
-            "未执行" if not validations else "已生成：" + ", ".join(path.name for path in validations)
+            "未执行"
+            if not validations
+            else "已生成：" + ", ".join(path.name for path in validations)
         )
 
     def select_section(self, section: str) -> None:
@@ -2850,32 +2823,38 @@ class StructureArchivePage(QWidget):
             QMessageBox.information(self, "目录不存在", f"归档目录尚不存在：\n{path}")
 
     def _run_index(self) -> None:
-        if not self._check_required([
-            ("归档目录", self.archive_dir_edit),
-            ("索引输出", self.archive_index_output),
-        ]):
+        if not self._check_required(
+            [
+                ("归档目录", self.archive_dir_edit),
+                ("索引输出", self.archive_index_output),
+            ]
+        ):
             return
         argv = [
             "condense-index",
-            "--condensed-dir", self.archive_dir_edit.text().strip(),
-            "--output", self.archive_index_output.text().strip(),
+            "--condensed-dir",
+            self.archive_dir_edit.text().strip(),
+            "--output",
+            self.archive_index_output.text().strip(),
         ]
         self.run_requested.emit(argv, "结构描述归档 · 建立索引")
 
     def _run_validation(self) -> None:
-        if not self._check_required([
-            ("归档目录", self.archive_dir_edit),
-            ("校验输出", self.archive_validation_output),
-        ]):
+        if not self._check_required(
+            [
+                ("归档目录", self.archive_dir_edit),
+                ("校验输出", self.archive_validation_output),
+            ]
+        ):
             return
         argv = [
             "condense-validate",
-            "--condensed-dir", self.archive_dir_edit.text().strip(),
-            "--output", self.archive_validation_output.text().strip(),
+            "--condensed-dir",
+            self.archive_dir_edit.text().strip(),
+            "--output",
+            self.archive_validation_output.text().strip(),
         ]
         self.run_requested.emit(argv, "结构描述归档 · 校验")
-
-
 
 
 class StructureMatchPage(QWidget):
@@ -3016,9 +2995,7 @@ class StructureMatchPage(QWidget):
         candidate_form.setHorizontalSpacing(12)
         candidate_form.setVerticalSpacing(7)
 
-        host, self.candidates_edit = self._path_editor(
-            "02_composition/composition_candidates.csv"
-        )
+        host, self.candidates_edit = self._path_editor("02_composition/composition_candidates.csv")
         candidate_form.addRow("组成候选表", host)
 
         candidate_status_host = QWidget()
@@ -3092,15 +3069,11 @@ class StructureMatchPage(QWidget):
         x_flow.setWordWrap(True)
         rule_form.addRow("X 占位符处理", x_flow)
 
-        basis = QLabel(
-            "配位数 · 配位几何 · 最近邻/多面体表达 · 组分连接关系"
-        )
+        basis = QLabel("配位数 · 配位几何 · 最近邻/多面体表达 · 组分连接关系")
         basis.setWordWrap(True)
         rule_form.addRow("环境匹配依据", basis)
 
-        limitation = QLabel(
-            "这些匹配依据由当前算法固定使用，并非可独立开关的 CLI 参数。"
-        )
+        limitation = QLabel("这些匹配依据由当前算法固定使用，并非可独立开关的 CLI 参数。")
         limitation.setWordWrap(True)
         limitation.setObjectName("optionHelp")
         rule_form.addRow("", limitation)
@@ -3143,9 +3116,7 @@ class StructureMatchPage(QWidget):
         actions = QHBoxLayout()
         copy_button = QPushButton("复制命令")
         copy_button.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                self.match_preview.toPlainText()
-            )
+            lambda: QApplication.clipboard().setText(self.match_preview.toPlainText())
         )
         refresh_button = QPushButton("刷新参数")
         refresh_button.clicked.connect(self._refresh_preview)
@@ -3257,9 +3228,7 @@ class StructureMatchPage(QWidget):
         self.template_count_label.setText(
             f"组成模板：{templates if candidate_path.exists() else '—'}"
         )
-        self.candidate_input_state.setText(
-            "Ready" if candidate_path.exists() else "文件不存在"
-        )
+        self.candidate_input_state.setText("Ready" if candidate_path.exists() else "文件不存在")
 
         for row in range(self.archive_table.rowCount()):
             item = self.archive_table.item(row, 0)
@@ -3288,7 +3257,8 @@ class StructureMatchPage(QWidget):
     def _match_argv(self) -> list[str]:
         argv = [
             "structure-match",
-            "--candidates", self.candidates_edit.text().strip(),
+            "--candidates",
+            self.candidates_edit.text().strip(),
         ]
 
         for archive in self._archive_paths():
@@ -3299,26 +3269,31 @@ class StructureMatchPage(QWidget):
                 pass
             argv.extend(["--condensed-dir", display])
 
-        argv.extend([
-            "--min-x-elements", self.min_x_edit.text().strip() or "2",
-            "--output", self.groups_output.text().strip(),
-            "--summary", self.summary_output.text().strip(),
-        ])
+        argv.extend(
+            [
+                "--min-x-elements",
+                self.min_x_edit.text().strip() or "2",
+                "--output",
+                self.groups_output.text().strip(),
+                "--summary",
+                self.summary_output.text().strip(),
+            ]
+        )
         return argv
 
     def _refresh_preview(self) -> None:
         if hasattr(self, "match_preview"):
-            self.match_preview.setPlainText(
-                shlex.join(["ss-screen", *self._match_argv()])
-            )
+            self.match_preview.setPlainText(shlex.join(["ss-screen", *self._match_argv()]))
 
     def _run_match(self) -> None:
-        if not self._check_required([
-            ("组成候选表", self.candidates_edit.text()),
-            ("结构描述归档", ", ".join(self._archive_paths())),
-            ("Structure Groups 输出", self.groups_output.text()),
-            ("阶段汇总", self.summary_output.text()),
-        ]):
+        if not self._check_required(
+            [
+                ("组成候选表", self.candidates_edit.text()),
+                ("结构描述归档", ", ".join(self._archive_paths())),
+                ("Structure Groups 输出", self.groups_output.text()),
+                ("阶段汇总", self.summary_output.text()),
+            ]
+        ):
             return
 
         try:
@@ -3393,9 +3368,7 @@ class StructureMatchPage(QWidget):
         self.groups_table.setColumnWidth(3, 145)
         self.groups_table.setColumnWidth(4, 270)
         self.groups_table.setMinimumHeight(245)
-        self.groups_table.itemSelectionChanged.connect(
-            self._refresh_group_detail
-        )
+        self.groups_table.itemSelectionChanged.connect(self._refresh_group_detail)
         groups_layout.addWidget(self.groups_table)
         layout.addWidget(groups_box, 1)
 
@@ -3454,10 +3427,7 @@ class StructureMatchPage(QWidget):
         # Support the column-oriented DataFrame JSON layout accepted by the
         # real SS-Screen loader.
         if isinstance(data, dict) and "entry_idx" in data:
-            columns = {
-                key: value for key, value in data.items()
-                if isinstance(value, dict)
-            }
+            columns = {key: value for key, value in data.items() if isinstance(value, dict)}
             row_keys: list[str] = []
             seen: set[str] = set()
             for values in columns.values():
@@ -3524,9 +3494,7 @@ class StructureMatchPage(QWidget):
 
         self.result_candidate_rows.setText(str(summary.get("candidate_rows", "—")))
         self.result_template_count.setText(str(summary.get("template_count", "—")))
-        self.result_group_count.setText(
-            str(summary.get("group_count", len(records)))
-        )
+        self.result_group_count.setText(str(summary.get("group_count", len(records))))
         self.result_grouped_members.setText(
             str(
                 summary.get(
@@ -3535,12 +3503,8 @@ class StructureMatchPage(QWidget):
                 )
             )
         )
-        self.result_missing.setText(
-            str(summary.get("missing_descriptions", "—"))
-        )
-        self.result_invalid.setText(
-            str(summary.get("invalid_descriptions", "—"))
-        )
+        self.result_missing.setText(str(summary.get("missing_descriptions", "—")))
+        self.result_invalid.setText(str(summary.get("invalid_descriptions", "—")))
         self.result_min_x.setText(str(summary.get("min_x_elements", "—")))
 
         self.groups_table.setRowCount(0)
@@ -3645,7 +3609,6 @@ class StructureMatchPage(QWidget):
         else:
             self.tabs.setCurrentIndex(1)
             self.refresh_results()
-
 
 
 @dataclass
@@ -3914,11 +3877,9 @@ class RecommendationReportPage(QWidget):
                 f"{rec.get('comp_a') or pair.get('comp_a')} / {rec.get('comp_b') or pair.get('comp_b')}",
                 rec.get("actual_fraction_b") or rec.get("target_fraction_b"),
                 f"{rec.get('gap_a_eV') or pair.get('gap_a')} / {rec.get('gap_b_eV') or pair.get('gap_b')}",
-                rec.get("mixing_enthalpy_meV_per_atom")
-                or mix.get("mixing_enthalpy_meV_per_atom"),
+                rec.get("mixing_enthalpy_meV_per_atom") or mix.get("mixing_enthalpy_meV_per_atom"),
                 rec.get("dynamical_status") or phonon.get("dynamical_status"),
-                rec.get("minimum_mesh_frequency_THz")
-                or phonon.get("minimum_mesh_frequency_THz"),
+                rec.get("minimum_mesh_frequency_THz") or phonon.get("minimum_mesh_frequency_THz"),
                 rec.get("energy_above_hull_eV_per_atom")
                 or hull.get("energy_above_hull_eV_per_atom"),
                 rec.get("hull_signal") or hull.get("hull_signal"),
@@ -4086,6 +4047,9 @@ class InspectorPanel(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.ssh_probe = QProcess(self)
+        self.ssh_probe.setProcessChannelMode(QProcess.MergedChannels)
+        self.ssh_probe.finished.connect(self._ssh_probe_finished)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(7)
@@ -4138,7 +4102,77 @@ class InspectorPanel(QWidget):
         runtime_form.addRow("", note)
         layout.addWidget(runtime_box)
 
+        ssh_box = QGroupBox("SSH Server / 远程服务器验证")
+        ssh_form = QFormLayout(ssh_box)
+        ssh_form.setContentsMargins(8, 10, 8, 8)
+        self.ssh_host = QLineEdit()
+        self.ssh_host.setPlaceholderText("服务器域名或IP")
+        self.ssh_user = QLineEdit()
+        self.ssh_user.setPlaceholderText("用户名")
+        self.ssh_port = QLineEdit("22")
+        self.ssh_key = QLineEdit()
+        self.ssh_key.setPlaceholderText("可选：SSH私钥路径")
+        self.ssh_remote_root = QLineEdit()
+        self.ssh_remote_root.setPlaceholderText("可选：服务器工程目录")
+        ssh_form.addRow("服务器", self.ssh_host)
+        ssh_form.addRow("用户名", self.ssh_user)
+        ssh_form.addRow("端口", self.ssh_port)
+        ssh_form.addRow("私钥", self.ssh_key)
+        ssh_form.addRow("远程目录", self.ssh_remote_root)
+        self.ssh_test = QPushButton("验证SSH与远程环境")
+        self.ssh_test.clicked.connect(self._test_ssh)
+        ssh_form.addRow("", self.ssh_test)
+        self.ssh_status = QLabel("未验证。只执行只读版本和路径探测，不提交计算任务。")
+        self.ssh_status.setWordWrap(True)
+        self.ssh_status.setObjectName("optionHelp")
+        ssh_form.addRow("状态", self.ssh_status)
+        layout.addWidget(ssh_box)
+
         layout.addStretch(1)
+
+    def _test_ssh(self) -> None:
+        host = self.ssh_host.text().strip()
+        user = self.ssh_user.text().strip()
+        if not host:
+            QMessageBox.information(self, "SSH验证", "请先填写服务器地址。")
+            return
+        target = f"{user}@{host}" if user else host
+        args = [
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=8",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-p",
+            self.ssh_port.text().strip() or "22",
+        ]
+        key = self.ssh_key.text().strip()
+        if key:
+            args.extend(["-i", key])
+        remote_root = self.ssh_remote_root.text().strip()
+        probe = (
+            "printf 'SSH_OK\\n'; "
+            "python3 --version 2>&1; "
+            "if command -v ss-screen >/dev/null 2>&1; then ss-screen --version; "
+            "else printf 'SS_SCREEN_NOT_FOUND\\n'; fi"
+        )
+        if remote_root:
+            probe += f"; if test -d {shlex.quote(remote_root)}; then printf 'REMOTE_ROOT_OK\\n'; else printf 'REMOTE_ROOT_MISSING\\n'; fi"
+        args.extend([target, probe])
+        self.ssh_status.setText(f"正在验证 {target} …")
+        self.ssh_test.setEnabled(False)
+        self.ssh_probe.start("ssh", args)
+
+    def _ssh_probe_finished(self, exit_code: int, _exit_status) -> None:
+        output = (
+            bytes(self.ssh_probe.readAllStandardOutput()).decode("utf-8", errors="replace").strip()
+        )
+        self.ssh_test.setEnabled(True)
+        if exit_code == 0 and "SSH_OK" in output:
+            self.ssh_status.setText("验证成功：\n" + output)
+        else:
+            self.ssh_status.setText(f"验证失败（退出码 {exit_code}）：\n{output or '无输出'}")
 
     def set_selection(
         self,
@@ -4240,6 +4274,8 @@ class MainWindow(QMainWindow):
 
         add_tool("＋ 新建工程", self.new_project)
         add_tool("打开工程", self.open_existing_project)
+        add_tool("打开 .ssproject", self.open_project_file)
+        add_tool("保存 .ssproject", self.save_project_file)
         add_tool("初始化", self.init_project)
         add_tool("打开目录", self.open_project)
         sep = QFrame()
@@ -4326,6 +4362,15 @@ class MainWindow(QMainWindow):
         self.structure_match_page = StructureMatchPage(self.project_root)
         self.structure_match_page.run_requested.connect(self.run_command)
         self.stack.addWidget(self.structure_match_page)
+
+        self.structure_results_page = StructureResultsPage(self.project_root)
+        self.stack.addWidget(self.structure_results_page)
+
+        self.phonon_results_page = PhononResultsPage(self.project_root)
+        self.stack.addWidget(self.phonon_results_page)
+
+        self.phase_results_page = PhaseResultsPage(self.project_root)
+        self.stack.addWidget(self.phase_results_page)
 
         self.recommendation_report_page = RecommendationReportPage(self.project_root)
         self.recommendation_report_page.run_requested.connect(self.run_command)
@@ -4524,20 +4569,12 @@ class MainWindow(QMainWindow):
                             (
                                 "mp_local",
                                 "Local Dataset / mp.df",
-                                (
-                                    "已生成"
-                                    if mp_df.exists()
-                                    else "未生成"
-                                ),
+                                ("已生成" if mp_df.exists() else "未生成"),
                             ),
                             (
                                 "mp_provenance",
                                 "Provenance / 来源记录",
-                                (
-                                    "已生成"
-                                    if mp_provenance.exists()
-                                    else "未生成"
-                                ),
+                                ("已生成" if mp_provenance.exists() else "未生成"),
                             ),
                         ):
                             child = QTreeWidgetItem([name, status_value])
@@ -4580,11 +4617,7 @@ class MainWindow(QMainWindow):
                             (
                                 "wbm_local",
                                 "Local Dataset / wbm.df",
-                                (
-                                    "已生成"
-                                    if wbm_df.exists()
-                                    else "未生成"
-                                ),
+                                ("已生成" if wbm_df.exists() else "未生成"),
                             ),
                         ):
                             child = QTreeWidgetItem([name, status_value])
@@ -4603,12 +4636,8 @@ class MainWindow(QMainWindow):
                     elif sid == "02":
                         composition_root = project.path / "02_composition"
                         valid_ids = composition_root / "valid_ids.json"
-                        candidate_file = (
-                            composition_root / "composition_candidates.csv"
-                        )
-                        composition_summary = (
-                            composition_root / "composition_summary.json"
-                        )
+                        candidate_file = composition_root / "composition_candidates.csv"
+                        composition_summary = composition_root / "composition_summary.json"
 
                         candidate_count = 0
                         template_count = None
@@ -4637,19 +4666,14 @@ class MainWindow(QMainWindow):
                             except Exception:
                                 pass
 
-                        if (
-                            candidate_count == 0
-                            and candidate_file.exists()
-                        ):
+                        if candidate_count == 0 and candidate_file.exists():
                             try:
                                 with candidate_file.open(
                                     "r",
                                     encoding="utf-8-sig",
                                     newline="",
                                 ) as handle:
-                                    candidate_count = sum(
-                                        1 for _ in csv.DictReader(handle)
-                                    )
+                                    candidate_count = sum(1 for _ in csv.DictReader(handle))
                             except Exception:
                                 candidate_count = 0
 
@@ -4675,9 +4699,7 @@ class MainWindow(QMainWindow):
                             "input": "MP / WBM / 自定义",
                             "rules": "Template screening",
                             "candidates": (
-                                f"{candidate_count} 条"
-                                if candidate_count
-                                else "未生成"
+                                f"{candidate_count} 条" if candidate_count else "未生成"
                             ),
                             "summary": (
                                 (
@@ -4691,9 +4713,7 @@ class MainWindow(QMainWindow):
                         }
 
                         for object_key, object_name in COMPOSITION_SCREEN_OBJECTS:
-                            object_item = QTreeWidgetItem(
-                                [object_name, object_status[object_key]]
-                            )
+                            object_item = QTreeWidgetItem([object_name, object_status[object_key]])
                             object_item.setData(
                                 0,
                                 Qt.UserRole,
@@ -4716,15 +4736,18 @@ class MainWindow(QMainWindow):
 
                         manifest_ready = (
                             any(archive_root.glob("*manifest*.jsonl"))
-                            if archive_root.exists() else False
+                            if archive_root.exists()
+                            else False
                         )
                         index_ready = (
                             any(archive_root.glob("*index*.csv"))
-                            if archive_root.exists() else False
+                            if archive_root.exists()
+                            else False
                         )
                         validation_ready = (
                             any(archive_root.glob("*validation*.csv"))
-                            if archive_root.exists() else False
+                            if archive_root.exists()
+                            else False
                         )
 
                         object_status = {
@@ -4735,9 +4758,7 @@ class MainWindow(QMainWindow):
                             "validation": "已校验" if validation_ready else "待校验",
                         }
                         for object_key, object_name in STRUCTURE_ARCHIVE_OBJECTS:
-                            object_item = QTreeWidgetItem(
-                                [object_name, object_status[object_key]]
-                            )
+                            object_item = QTreeWidgetItem([object_name, object_status[object_key]])
                             object_item.setData(
                                 0,
                                 Qt.UserRole,
@@ -4752,9 +4773,7 @@ class MainWindow(QMainWindow):
 
                     elif sid == "04":
                         candidate_file = (
-                            project.path
-                            / "02_composition"
-                            / "composition_candidates.csv"
+                            project.path / "02_composition" / "composition_candidates.csv"
                         )
                         archive_root = project.path / "03_condensed"
                         archive_count = 0
@@ -4764,11 +4783,7 @@ class MainWindow(QMainWindow):
                                 archive_count += 1
 
                         groups_file = project.path / "04_groups" / "groups.json"
-                        summary_file = (
-                            project.path
-                            / "04_groups"
-                            / "structure_match_summary.json"
-                        )
+                        summary_file = project.path / "04_groups" / "structure_match_summary.json"
 
                         group_count = 0
                         if groups_file.exists():
@@ -4788,18 +4803,12 @@ class MainWindow(QMainWindow):
                         object_status = {
                             "input": "Ready" if input_ready else "待准备",
                             "rules": "X substitution",
-                            "groups": (
-                                f"{group_count} groups"
-                                if group_count
-                                else "未生成"
-                            ),
+                            "groups": (f"{group_count} groups" if group_count else "未生成"),
                             "summary": "已生成" if summary_file.exists() else "未生成",
                         }
 
                         for object_key, object_name in STRUCTURE_MATCH_OBJECTS:
-                            object_item = QTreeWidgetItem(
-                                [object_name, object_status[object_key]]
-                            )
+                            object_item = QTreeWidgetItem([object_name, object_status[object_key]])
                             object_item.setData(
                                 0,
                                 Qt.UserRole,
@@ -4887,9 +4896,7 @@ class MainWindow(QMainWindow):
             if sid == "01":
                 self.dataset_source_page.select_section("mp")
                 self.stack.setCurrentWidget(self.dataset_source_page)
-                self.document_label.setText(
-                    f"{project.name} / 数据源"
-                )
+                self.document_label.setText(f"{project.name} / 数据源")
                 self.inspector.set_selection(
                     item_type="工程阶段",
                     name="Stage 01：外部材料数据源",
@@ -4899,9 +4906,7 @@ class MainWindow(QMainWindow):
             elif sid == "02":
                 self.composition_screen_page.select_section("screen")
                 self.stack.setCurrentWidget(self.composition_screen_page)
-                self.document_label.setText(
-                    f"{project.name} / 组成模板筛选"
-                )
+                self.document_label.setText(f"{project.name} / 组成模板筛选")
                 self.inspector.set_selection(
                     item_type="工程阶段",
                     name="流程第 1 步：组成模板筛选",
@@ -4921,12 +4926,40 @@ class MainWindow(QMainWindow):
             elif sid == "04":
                 self.structure_match_page.select_section("match")
                 self.stack.setCurrentWidget(self.structure_match_page)
-                self.document_label.setText(
-                    f"{project.name} / 结构匹配与材料分组"
-                )
+                self.document_label.setText(f"{project.name} / 结构匹配与材料分组")
                 self.inspector.set_selection(
                     item_type="工程阶段",
                     name="流程第 3 步：结构匹配与材料分组",
+                    path=str(project.path / directory),
+                    status=status if count == 0 else f"{status} · {count} 项",
+                )
+            elif sid == "08":
+                self.structure_results_page.refresh()
+                self.stack.setCurrentWidget(self.structure_results_page)
+                self.document_label.setText(f"{project.name} / MACE 驰豫结构")
+                self.inspector.set_selection(
+                    item_type="晶体结构结果",
+                    name="Stage 08：MatterViz 晶体结构",
+                    path=str(project.path / directory),
+                    status=status if count == 0 else f"{status} · {count} 项",
+                )
+            elif sid == "10":
+                self.phonon_results_page.refresh()
+                self.stack.setCurrentWidget(self.phonon_results_page)
+                self.document_label.setText(f"{project.name} / 声子谱可视化")
+                self.inspector.set_selection(
+                    item_type="声子谱结果",
+                    name="Stage 10：频带、DOS与晶体结构",
+                    path=str(project.path / directory),
+                    status=status if count == 0 else f"{status} · {count} 项",
+                )
+            elif sid == "11":
+                self.phase_results_page.refresh()
+                self.stack.setCurrentWidget(self.phase_results_page)
+                self.document_label.setText(f"{project.name} / 竞争相与凸包可视化")
+                self.inspector.set_selection(
+                    item_type="竞争相结果",
+                    name="Stage 11：凸包、竞争相与晶体结构",
                     path=str(project.path / directory),
                     status=status if count == 0 else f"{status} · {count} 项",
                 )
@@ -4955,9 +4988,7 @@ class MainWindow(QMainWindow):
             object_key, object_name = data[2], data[3]
             self.dataset_source_page.select_section(object_key)
             self.stack.setCurrentWidget(self.dataset_source_page)
-            self.document_label.setText(
-                f"{project.name} / 数据源 / {object_name}"
-            )
+            self.document_label.setText(f"{project.name} / 数据源 / {object_name}")
 
             if object_key.startswith("mp"):
                 if object_key in {"mp_local", "mp_provenance"}:
@@ -4984,9 +5015,7 @@ class MainWindow(QMainWindow):
             object_key, object_name = data[2], data[3]
             self.composition_screen_page.select_section(object_key)
             self.stack.setCurrentWidget(self.composition_screen_page)
-            self.document_label.setText(
-                f"{project.name} / 组成模板筛选 / {object_name}"
-            )
+            self.document_label.setText(f"{project.name} / 组成模板筛选 / {object_name}")
 
             if object_key in {"candidates", "summary"}:
                 object_type = "组成筛选结果"
@@ -5007,9 +5036,7 @@ class MainWindow(QMainWindow):
             object_key, object_name = data[2], data[3]
             self.structure_archive_page.select_section(object_key)
             self.stack.setCurrentWidget(self.structure_archive_page)
-            self.document_label.setText(
-                f"{project.name} / 结构描述归档 / {object_name}"
-            )
+            self.document_label.setText(f"{project.name} / 结构描述归档 / {object_name}")
             self.inspector.set_selection(
                 item_type="结构归档对象",
                 name=object_name,
@@ -5022,9 +5049,7 @@ class MainWindow(QMainWindow):
             object_key, object_name = data[2], data[3]
             self.structure_match_page.select_section(object_key)
             self.stack.setCurrentWidget(self.structure_match_page)
-            self.document_label.setText(
-                f"{project.name} / 结构匹配与材料分组 / {object_name}"
-            )
+            self.document_label.setText(f"{project.name} / 结构匹配与材料分组 / {object_name}")
 
             if object_key in {"groups", "summary"}:
                 object_path = project.path / "04_groups"
@@ -5082,6 +5107,9 @@ class MainWindow(QMainWindow):
         self.active_project_label.setToolTip(str(project.path))
         self._refresh_file_tree()
         self.dashboard.refresh()
+        self.structure_results_page.refresh()
+        self.phonon_results_page.refresh()
+        self.phase_results_page.refresh()
 
     def new_project(self) -> None:
         parent = QFileDialog.getExistingDirectory(
@@ -5142,6 +5170,83 @@ class MainWindow(QMainWindow):
         )
         self.document_label.setText(f"{project.name} / 工程概览")
         self.statusBar().showMessage(f"已打开工程：{project.name}")
+
+    def _project_settings_snapshot(self) -> dict[str, Any]:
+        commands: dict[str, list[str]] = {}
+        for path, page in self._pages.items():
+            commands[" ".join(path)] = page.argv()
+        return {
+            "runtime_backend": self.runtime_backend.currentText(),
+            "wsl_project_path": self.wsl_root.text().strip(),
+            "commands": commands,
+        }
+
+    def save_project_file(self) -> None:
+        project = self._active_project
+        if project is None:
+            return
+        default = project.path.parent / f"{project.name}.ssproject"
+        value, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存 SS-Screen 单文件工程",
+            str(default),
+            "SS-Screen Project (*.ssproject)",
+        )
+        if not value:
+            return
+        target = Path(value)
+        if target.suffix.lower() != ".ssproject":
+            target = target.with_suffix(".ssproject")
+        try:
+            manifest = create_project_file(
+                project.path,
+                target,
+                project_settings=self._project_settings_snapshot(),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "保存项目失败", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "项目已保存",
+            f"已写入 {manifest['artifact_count']} 个文件，"
+            f"原始数据 {manifest['total_bytes'] / 1024:.1f} KiB。\n{target}",
+        )
+        self.statusBar().showMessage(f"已保存单文件工程：{target.name}")
+
+    def open_project_file(self) -> None:
+        value, _ = QFileDialog.getOpenFileName(
+            self,
+            "打开 SS-Screen 单文件工程",
+            str(self.project_root()),
+            "SS-Screen Project (*.ssproject)",
+        )
+        if not value:
+            return
+        source = Path(value).resolve()
+        try:
+            project_metadata, _manifest = inspect_project_file(source)
+            source_digest = hashlib.sha256()
+            with source.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    source_digest.update(chunk)
+            digest = source_digest.hexdigest()[:12]
+            cache_base = (
+                Path(os.environ.get("LOCALAPPDATA", Path.home())) / "SS-Screen" / "projects"
+            )
+            cache_root = cache_base / f"{source.stem}-{digest}"
+            extract_project_file(source, cache_root)
+            project = self._add_project(
+                cache_root,
+                name=str(project_metadata.get("name") or source.stem),
+                initialize=False,
+                activate=True,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "打开项目失败", str(exc))
+            return
+        self.document_label.setText(f"{project.name} / 工程概览")
+        self.statusBar().showMessage(f"已校验并打开：{source.name}")
 
     def remove_active_project(self) -> None:
         project = self._active_project
@@ -5455,7 +5560,9 @@ class MainWindow(QMainWindow):
         self.log.insertPlainText(text)
         self.log.moveCursor(QTextCursor.End)
         if self.process.state() != QProcess.NotRunning:
-            last_line = next((line.strip() for line in reversed(text.splitlines()) if line.strip()), "")
+            last_line = next(
+                (line.strip() for line in reversed(text.splitlines()) if line.strip()), ""
+            )
             if last_line:
                 self.run_state_label.setText(f"正在计算：{_compact_value(last_line, max_len=42)}")
 
@@ -5465,11 +5572,7 @@ class MainWindow(QMainWindow):
         self.run_progress.setVisible(False)
         self.run_state_label.setText("完成" if exit_code == 0 else f"结束：退出码 {exit_code}")
 
-        finished_command = (
-            self._current_run.command
-            if self._current_run is not None
-            else ""
-        )
+        finished_command = self._current_run.command if self._current_run is not None else ""
 
         if self._current_run is not None:
             self._current_run.exit_code = exit_code
@@ -5483,6 +5586,9 @@ class MainWindow(QMainWindow):
         self.structure_archive_page.refresh_archive()
         self.structure_match_page.refresh_inputs()
         self.structure_match_page.refresh_results()
+        self.structure_results_page.refresh()
+        self.phonon_results_page.refresh()
+        self.phase_results_page.refresh()
         self.recommendation_report_page.refresh()
         self._refresh_file_tree()
         self._rebuild_project_tree()

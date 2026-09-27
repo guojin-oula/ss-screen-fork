@@ -7,6 +7,53 @@
 
 **Read first at the start of every session:** `AGENTS.md` → this file → `PROJECT_PLAN.md`.
 
+## 2026-09-28 — 修正竞争相表格和 MatterViz 页面填充
+
+**本次工作目标：** 解决 Stage 11 表格内容被挤压、视觉上近似空白，以及部分 MatterViz 只占半个工作区的问题。
+
+**已完成：**
+- 更新 `src/ssscreen/gui/visualization.py`：竞争相表格显示 28 条记录计数，结构 ID 列自适应填充，其他列使用稳定宽度，并格式化角色、目标标志和凸包距离。
+- Stage 10 MatterViz 从右侧半栏调整为独立完整标签页；Stage 10/11 WebEngine 控件采用扩展尺寸和不可折叠布局。
+- 更新 `gui-matterviz/src/style.css` 并重建 `src/ssscreen/gui/matterviz_dist/`，使根容器与 canvas 填满 QtWebEngine 可用区域。
+- 1280×760 页面验证：竞争相 28 行、声子 3 行，两个 MatterViz 页面均获得约 1256×691 内容区域；Ruff、`py_compile`、项目文件测试和前端构建通过。
+
+**决策 / 计划变更：** 结果页优先使用完整标签页承载三维晶体，避免与数据表或图像强制并排导致显示面积不足。
+
+**下一步：** 用实际 Windows GUI 重新打开示例 `.ssproject`，人工检查不同窗口尺寸下的晶体交互和表格可读性。
+
+**阻塞项 / 上游问题：** MatterViz 0.7.0 高级控制侧栏仍因上游 `svelte-widgets` 兼容问题保持关闭，不影响核心三维视图。
+
+## 2026-09-27 — 排除 MatterViz 本地 npm 依赖
+
+**本次工作目标：** 防止 `gui-matterviz` 本地安装依赖进入版本库，同时保留可复现构建所需源码。
+
+**已完成：**
+- 更新 `.gitignore`，新增 `/gui-matterviz/node_modules/` 精确忽略规则。
+- 确认 Svelte 源码、`package.json`、`package-lock.json`、公共资源和 Vite 配置仍由 Git 发现。
+- 同步更新 `ZMD/01_项目入口与配置/README.md` 与 `ZMD/07_版本与变更索引/README.md`。
+
+**决策 / 计划变更：** 不忽略整个 `gui-matterviz/`，因为它包含内嵌 MatterViz 的权威前端源码和可复现依赖锁；只排除约 162 MB 的可重新安装依赖。
+
+**下一步：** 提交代码时纳入 `gui-matterviz` 源码和 `src/ssscreen/gui/matterviz_dist` 分发资源，不纳入 `node_modules`。
+
+**阻塞项 / 上游问题：** 无。
+
+## 2026-09-27 — 集成 GUI 可视化、单文件项目与 SSH 探测
+
+**本次工作目标：** 在不启动真实远端作业的前提下，完成桌面端结果可视化、CPU/GPU 选择、参数中文化和 `.ssproject` 单文件项目原型。
+
+**已完成：**
+- 新增 `src/ssscreen/gui/project_file.py` 与 `tests/test_gui_project_file.py`，实现 Stage 01--12 ZIP64 项目容器、SHA-256 清单、安全解包、原子保存及篡改检测；真实算例 187 个制品回读通过。
+- 新增 `src/ssscreen/gui/visualization.py` 与 `gui-matterviz/`，Stage 08/10/11 可显示 MatterViz 晶体、声子状态/band/DOS、竞争相表格和三元组成图；MatterViz 构建资源已进入 wheel。
+- 更新 `src/ssscreen/gui/app.py` 与 `metadata.py`：加入 `.ssproject` 打开/保存、中文参数标签、MACE CPU 默认设备、可视化路由和 SSH 只读环境探测。
+- 核心 174 项 pytest、目标 Ruff、MatterViz production build、Windows headless GUI 数据加载和真实浏览器 WebGL 验收通过。
+
+**决策 / 计划变更：** SSH 本轮只验证认证、远端 Python/`ss-screen` 和工程目录，不实现任务提交/轮询/停止/下载；`.ssproject` 不保存 API Key。MatterViz 0.7.0 高级控制面板因上游 `svelte-widgets` 多选默认值异常暂时关闭，保留核心三维交互。
+
+**下一步：** 获得服务器测试账号后设计并验证远端作业 ID、状态文件、断线重连、增量日志、结果下载和安全停止协议；再补一条真实服务器端到端冒烟测试。
+
+**阻塞项 / 上游问题：** AGENTS 指定的 `/home/zuolong/projects/ss-screen-learning-20260722` 在当前 WSL 不存在，本次按实际仓库 `/mnt/d/WorkSpace/OtherProjects/ss-screen` 的完整 `.venv` 工作；尚无 SSH 服务器地址/账号，无法验证真实远端认证和调度状态。
+
 ## 2026-09-18 — 调整声子输入残余力默认阈值
 
 **本次工作目标：** 将声子流程的 `max-input-force` 默认值从 `0.01` 调整为 `0.02 eV/Angstrom`。

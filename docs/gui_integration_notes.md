@@ -41,12 +41,39 @@ ss-screen-gui
 For a fuller Ubuntu development environment, use the repository
 `requirements.txt`.
 
+## Desktop Result And Project Integration
+
+- Stage 08 opens the relaxed/SQS structure browser and renders the selected
+  structure with the bundled MatterViz 0.7.0 WebGL frontend.
+- Stage 10 presents phonon status, minimum frequency, band/DOS figures, and the
+  linked structure in one page.
+- Stage 11 presents the competing-phase table, a ternary composition/hull map,
+  and the selected competing structure.
+- CPU is the default MACE device in the desktop presets. Users may still enter
+  an explicit CUDA device when the target machine benefits from GPU execution.
+- CLI option rows display a Chinese label together with the authoritative
+  command-line flag so domain users can understand the parameter without losing
+  reproducibility.
+- `.ssproject` is a ZIP64 project container with a versioned `project.json`, an
+  SHA-256 manifest, and artifacts from Stage 01 through Stage 12. API keys are
+  explicitly excluded. Opening a project validates paths and checksums before
+  extracting it to the application project cache.
+- The SSH panel is intentionally a read-only validation probe in this iteration.
+  It checks authentication, remote Python/`ss-screen`, and an optional remote
+  project directory; it does not submit, stop, poll, or download remote jobs.
+
+The MatterViz control sidebar is disabled because MatterViz 0.7.0 currently
+triggers a `svelte-widgets` multi-select initialization error in that optional
+panel. Core WebGL rendering, atom visibility, replication, mouse rotation,
+zoom, and pan remain available.
+
 ## Near-Term Follow-Up
 
 - Add a small import/launcher smoke test once a GUI-capable CI environment is
   available, or keep it guarded so headless Linux does not need a display server.
 - Review each specialized GUI page against the restored real Click command
   options and remove any parameter that is only valid in the standalone demo.
-- Decide whether Windows should run the GUI natively while dispatching heavy
-  scientific work to WSL/Ubuntu, or whether both GUI and CLI should run inside
-  Linux with X11/Wayland forwarding.
+- Promote the SSH probe into an explicit remote-job protocol only after a server
+  test account is available. That protocol still needs upload/download rules,
+  remote process identity, durable status files, reconnect behavior, and safe
+  cancellation semantics.

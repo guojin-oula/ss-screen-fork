@@ -14,6 +14,9 @@
 | [`app.py`](../../src/ssscreen/gui/app.py) | PySide6 主窗口、工程树、专用阶段页面、命令日志和 `QProcess` 子进程执行；支持 IDE 直接按脚本启动、Windows GUI 调 WSL 后端、递归导入本地 POSCAR 文件夹 |
 | [`launcher.py`](../../src/ssscreen/gui/launcher.py) | `ss-screen-gui` 控制台入口 |
 | [`metadata.py`](../../src/ssscreen/gui/metadata.py) | 阶段标题、命令展示顺序和工程内默认路径预设 |
+| [`project_file.py`](../../src/ssscreen/gui/project_file.py) | `.ssproject` ZIP64 项目容器、SHA-256 清单、安全解包与原子保存 |
+| [`visualization.py`](../../src/ssscreen/gui/visualization.py) | MatterViz 晶体、声子图表和竞争相/凸包结果页 |
+| [`matterviz_dist/`](../../src/ssscreen/gui/matterviz_dist/) | 随 Python wheel 分发的 MatterViz 0.7.0 静态前端与第三方许可证 |
 
 ## 关键边界
 
@@ -41,6 +44,11 @@
 - Stage 12 使用专用结果报告页，内嵌 Markdown 报告预览，并合并推荐、pair、SQS、混合焓、声子和
   凸包关键字段展示候选材料的具体数值与结构文件路径。
 - 工具栏显示运行状态和不确定进度条，用于提示当前后端任务仍在计算。
+- Stage 08/10/11 分别提供晶体、声子和竞争相可视化；晶体视图由内嵌 Qt WebEngine 加载随包分发的
+  MatterViz 前端，声子页显示状态/最低频率/band/DOS，竞争相页显示表格与三元组成图。
+- MACE GUI 预设默认使用 `cpu`，仍允许用户手动输入 CUDA 设备；CLI 参数显示为“中文名称（英文参数）”。
+- 工具栏可保存/打开 `.ssproject` 单文件；容器保存 Stage 01--12、用户命令配置和校验清单，不保存 MP API Key。
+- SSH 目前仅实现只读验证按钮，检查认证、远端 Python、`ss-screen` 和可选工程目录，不提交远端计算。
 
 ## 验证建议
 
@@ -52,6 +60,10 @@
 
 ## 最近同步
 
+- 2026-09-28：修正结果可视化布局；Stage 11 竞争相表格显示条目数量、中文角色/目标值和格式化凸包距离，
+  列宽填满可视区域；Stage 10/11 的 MatterViz 改为完整标签页并使用扩展尺寸策略。
+- 2026-09-27：新增 `.ssproject` 单文件项目、MatterViz 晶体视图、声子与竞争相可视化、CPU 默认设备、
+  CLI 参数中文标签和 SSH 只读连通性探测；MatterViz 高级控制面板因上游 `svelte-widgets` 兼容问题暂时关闭。
 - 2026-09-18：声子一步式运行的 `--max-input-force` 默认值由 `0.01` 调整为 `0.02 eV/Angstrom`，
   并将该页面的 `--include-endmembers` 设为默认勾选。
 - 2026-09-17：简化 GUI 后段流程显示，隐藏 Stage 10/11 拆分命令；`--include-endmembers` 默认勾选并只

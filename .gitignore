@@ -34,6 +34,9 @@ web/frontend/test-results/
 web/frontend/.playwright-browsers/
 web/frontend/*.tsbuildinfo
 
+# MatterViz source is tracked; npm dependencies are reproducible from the lockfile.
+/gui-matterviz/node_modules/
+
 # Editors / OS
 .idea/
 .vscode/

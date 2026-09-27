@@ -1,0 +1,23 @@
+{
+  "name": "gui-matterviz",
+  "version": "1.0.0",
+  "description": "Bundled MatterViz viewer for the SS-Screen desktop GUI",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "matterviz": "^0.7.0",
+    "svelte": "^5.56.10"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "vite": "^8.3.1"
+  }
+}
