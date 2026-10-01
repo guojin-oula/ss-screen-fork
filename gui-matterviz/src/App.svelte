@@ -4,20 +4,36 @@
   import { open_material } from 'matterviz/file-viewer/open'
 
   let structure = null
+  let structureKey = 0
   let title = '请选择结构文件'
   let message = '支持 pymatgen JSON、POSCAR、CONTCAR、CIF 和 XYZ。'
 
-  window.ssScreenLoadStructure = async (content, filename = 'structure.json', label = filename) => {
-    try {
-      const opened = await open_material({ data: content, filename })
-      structure = opened.type === 'structure' ? opened.data : null
-      title = label
-      message = structure ? '' : 'MatterViz 未能识别该结构。'
-    } catch (error) {
-      structure = null
-      message = `结构加载失败：${error?.message ?? error}`
-    }
-  }
+  window.ssScreenLoadStructure = async (
+	  content,
+	  filename = 'structure.json',
+	  label = filename
+	) => {
+	  try {
+		const opened = await open_material({
+		  data: content,
+		  filename
+		})
+
+		if (opened.type === 'structure') {
+		  structure = opened.data
+		  structureKey += 1
+
+		  title = label
+		  message = ''
+		} else {
+		  structure = null
+		  message = 'MatterViz 未能识别该结构。'
+		}
+	  } catch (error) {
+		structure = null
+		message = `结构加载失败：${error?.message ?? error}`
+	  }
+	}
 
   window.ssScreenClearStructure = () => {
     structure = null
@@ -36,7 +52,7 @@
       await window.ssScreenLoadStructure(
         await response.text(),
         'demo-CaSe.json',
-        'CaSe 演示结构（仅用于界面验收）',
+        'CaSe 演示结构',
       )
     } catch (error) {
       message = `演示结构加载失败：${error?.message ?? error}`
@@ -51,12 +67,14 @@
   </header>
   <section>
     {#if structure}
-      <Structure
-        {structure}
-        show_controls={false}
-        style="width: 100%; height: 100%;"
-      />
-    {:else}
+	  {#key structureKey}
+		<Structure
+		  {structure}
+		  show_controls={false}
+		  style="width: 100%; height: 100%;"
+		/>
+	  {/key}
+	{:else}
       <div class="empty">{message}</div>
     {/if}
   </section>
