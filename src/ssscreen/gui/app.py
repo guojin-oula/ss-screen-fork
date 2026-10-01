@@ -24,7 +24,7 @@ from typing import Any
 import click
 
 try:
-    from PySide6.QtCore import QProcess, QProcessEnvironment, Qt, QUrl, Signal
+    from PySide6.QtCore import QSize, QProcess, QProcessEnvironment, Qt, QUrl, Signal
     from PySide6.QtGui import QDesktopServices, QFont, QTextCursor
     from PySide6.QtWidgets import (
         QAbstractItemView,
@@ -71,6 +71,7 @@ if __package__ in {None, ""}:
         sys.path.insert(0, str(src_root))
     from ssscreen import __version__
     from ssscreen.cli.app import cli
+    from ssscreen.gui.icons import app_icon, stage_icon
     from ssscreen.gui.metadata import (
         COMMANDS,
         PATH_PRESETS,
@@ -90,6 +91,7 @@ else:
     from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation, option_label_zh
     from .project_file import create_project_file, extract_project_file, inspect_project_file
     from .visualization import PhaseResultsPage, PhononResultsPage, StructureResultsPage
+    from .icons import app_icon, stage_icon
 
 
 APP_TITLE = f"SS-Screen V{__version__} · Materials Engineering Workbench"
@@ -458,10 +460,18 @@ class CommandPage(QWidget):
 
         actions = QHBoxLayout()
         reset_btn = QPushButton("重置")
+        reset_btn.setIcon(app_icon("reset"))
+        reset_btn.setIconSize(QSize(16, 16))
         reset_btn.clicked.connect(self.reset)
+
         copy_btn = QPushButton("复制")
+        copy_btn.setIcon(app_icon("copy"))
+        copy_btn.setIconSize(QSize(16, 16))
         copy_btn.clicked.connect(self.copy_command)
+
         run_btn = QPushButton("运行任务")
+        run_btn.setIcon(app_icon("run"))
+        run_btn.setIconSize(QSize(16, 16))
         run_btn.setObjectName("primaryButton")
         run_btn.clicked.connect(self.emit_run)
         actions.addWidget(reset_btn)
@@ -4265,24 +4275,67 @@ class MainWindow(QMainWindow):
         tools.setContentsMargins(6, 4, 6, 4)
         tools.setSpacing(4)
 
-        def add_tool(text, slot, object_name="toolButton"):
+        def add_tool(
+            text,
+            slot,
+            object_name="toolButton",
+            icon_name=None,
+        ):
             button = QPushButton(text)
             button.setObjectName(object_name)
+
+            if icon_name:
+                button.setIcon(app_icon(icon_name))
+                button.setIconSize(QSize(17, 17))
+
             button.clicked.connect(slot)
             tools.addWidget(button)
             return button
 
-        add_tool("＋ 新建工程", self.new_project)
-        add_tool("打开工程", self.open_existing_project)
-        add_tool("打开 .ssproject", self.open_project_file)
-        add_tool("保存 .ssproject", self.save_project_file)
-        add_tool("初始化", self.init_project)
-        add_tool("打开目录", self.open_project)
+        add_tool(
+            "新建工程",
+            self.new_project,
+            icon_name="new_project",
+        )
+
+        add_tool(
+            "打开工程",
+            self.open_existing_project,
+            icon_name="open_project",
+        )
+
+        add_tool(
+            "打开 .ssproject",
+            self.open_project_file,
+            icon_name="open_project_file",
+        )
+
+        add_tool(
+            "保存 .ssproject",
+            self.save_project_file,
+            icon_name="save_project_file",
+        )
+
+        add_tool(
+            "初始化",
+            self.init_project,
+            icon_name="initialize",
+        )
+
+        add_tool(
+            "打开目录",
+            self.open_project,
+            icon_name="open_directory",
+        )
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
         sep.setObjectName("toolbarSeparator")
         tools.addWidget(sep)
-        add_tool("从工作区移除", self.remove_active_project)
+        add_tool(
+            "从工作区移除",
+            self.remove_active_project,
+            icon_name="remove",
+        )
         tools.addStretch(1)
         self.run_state_label = QLabel("空闲")
         self.run_state_label.setObjectName("runStateLabel")
@@ -4293,7 +4346,12 @@ class MainWindow(QMainWindow):
         self.run_progress.setFixedWidth(150)
         self.run_progress.setVisible(False)
         tools.addWidget(self.run_progress)
-        add_tool("■ 停止", self.stop_process, "stopButton")
+        add_tool(
+            "停止",
+            self.stop_process,
+            "stopButton",
+            icon_name="stop",
+        )
         root.addWidget(toolbar)
 
         workspace = QSplitter(Qt.Horizontal)
@@ -4313,6 +4371,7 @@ class MainWindow(QMainWindow):
         self.nav = QTreeWidget()
         self.nav.setObjectName("navigation")
         self.nav.setHeaderLabels(["工程 / 对象", "状态"])
+        self.nav.setIconSize(QSize(18, 18))
         self.nav.setColumnWidth(0, 225)
         self.nav.setIndentation(17)
         self.nav.setRootIsDecorated(True)
@@ -4509,17 +4568,20 @@ class MainWindow(QMainWindow):
 
         for project in self._projects:
             root_item = QTreeWidgetItem([project.name, ""])
+            root_item.setIcon(0, app_icon("project"))
             root_item.setData(0, Qt.UserRole, ("project", str(project.path)))
             root_item.setToolTip(0, str(project.path))
             root_item.setFirstColumnSpanned(False)
             self.nav.addTopLevelItem(root_item)
 
             overview = QTreeWidgetItem(["工程概览", ""])
+            overview.setIcon(0, app_icon("dashboard"))
             overview.setData(0, Qt.UserRole, ("dashboard", str(project.path)))
             root_item.addChild(overview)
 
             for group_name, stage_ids in STAGE_GROUPS:
                 group_item = QTreeWidgetItem([group_name, ""])
+                group_item.setIcon(0, app_icon("group"))
                 group_item.setData(0, Qt.UserRole, ("group", str(project.path), group_name))
                 root_item.addChild(group_item)
 
@@ -4529,6 +4591,7 @@ class MainWindow(QMainWindow):
                     status, count = self._stage_status(project.path, directory)
                     status_text = status if count == 0 else f"{status} ({count})"
                     stage_item = QTreeWidgetItem([f"{sid}  {stage_name}", status_text])
+                    stage_item.setIcon(0, stage_icon(sid))
                     stage_item.setData(
                         0,
                         Qt.UserRole,
@@ -4548,6 +4611,7 @@ class MainWindow(QMainWindow):
                                 "Ready" if mp_df.exists() else "未获取",
                             ]
                         )
+                        mp_parent.setIcon(0, app_icon("dataset"))
                         mp_parent.setData(
                             0,
                             Qt.UserRole,
@@ -4596,6 +4660,7 @@ class MainWindow(QMainWindow):
                                 "Ready" if wbm_df.exists() else "未获取",
                             ]
                         )
+                        wbm_parent.setIcon(0, app_icon("dataset"))
                         wbm_parent.setData(
                             0,
                             Qt.UserRole,
@@ -4838,10 +4903,12 @@ class MainWindow(QMainWindow):
                 group_item.setExpanded(True)
 
             files_item = QTreeWidgetItem(["工程文件", ""])
+            files_item.setIcon(0, app_icon("files"))
             files_item.setData(0, Qt.UserRole, ("files", str(project.path)))
             root_item.addChild(files_item)
 
             logs_item = QTreeWidgetItem(["运行记录", ""])
+            logs_item.setIcon(0, app_icon("logs"))
             logs_item.setData(0, Qt.UserRole, ("logs", str(project.path)))
             root_item.addChild(logs_item)
 

@@ -153,7 +153,7 @@ class StructureResultsPage(QWidget):
         layout.addLayout(header)
 
         self.selector = QComboBox()
-        self.selector.currentIndexChanged.connect(self._selection_changed)
+        self.selector.activated.connect(self._selection_changed)
         layout.addWidget(self.selector)
         self.viewer = MatterVizView()
         self.viewer.setMinimumHeight(460)
@@ -165,34 +165,73 @@ class StructureResultsPage(QWidget):
 
     def refresh(self) -> None:
         current = self.selector.currentData()
+
         self.selector.blockSignals(True)
         self.selector.clear()
+
         patterns = (
             "07_sqs/structures/**/*.json",
             "08_relax/structures/**/*.json",
             "10_phonon/inputs/**/structures/reference.json",
             "11_phase/relaxation/structures/*.json",
         )
+
         seen: set[Path] = set()
+
         for pattern in patterns:
             for path in sorted(self._root().glob(pattern)):
                 resolved = path.resolve()
+
                 if resolved in seen:
                     continue
+
                 seen.add(resolved)
-                label = path.relative_to(self._root()).as_posix()
-                self.selector.addItem(label, str(path))
+
+                label = path.relative_to(
+                    self._root()
+                ).as_posix()
+
+                self.selector.addItem(
+                    label,
+                    str(resolved),
+                )
+
+        target_index = -1
+
+        if self.selector.count() > 0:
+            target_index = 0
+
+            if current:
+                found = self.selector.findData(current)
+                if found >= 0:
+                    target_index = found
+
+            self.selector.setCurrentIndex(target_index)
+
         self.selector.blockSignals(False)
-        if current:
-            index = self.selector.findData(current)
-            if index >= 0:
-                self.selector.setCurrentIndex(index)
-        self._selection_changed(self.selector.currentIndex())
+
+        # 初始化时只加载一次
+        if target_index >= 0:
+            self._selection_changed(target_index)
 
     def _selection_changed(self, index: int) -> None:
-        if index >= 0:
-            path = Path(str(self.selector.itemData(index)))
-            self.viewer.load_structure(path, self.selector.itemText(index))
+        if index < 0:
+            return
+
+        data = self.selector.itemData(index)
+
+        if not data:
+            return
+
+        path = Path(str(data))
+
+        if not path.is_file():
+            return
+
+        self.viewer.load_structure(
+            path,
+            self.selector.itemText(index),
+        )
 
 
 class ScaledImage(QLabel):
