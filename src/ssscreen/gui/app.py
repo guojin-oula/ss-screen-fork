@@ -751,7 +751,7 @@ class DatasetSourcePage(QWidget):
 
         api_note = QLabel(
             "API 模式下不在命令里保存密钥。请在右侧 Properties → Connection "
-            "填写 MP API Key；GUI 只把它注入当前运行进程。"
+            "填写 MP API Key"
         )
         api_note.setWordWrap(True)
         api_note.setObjectName("optionHelp")
@@ -1004,7 +1004,7 @@ class DatasetSourcePage(QWidget):
         identity_layout = QVBoxLayout(identity)
         intro = QLabel(
             "把本地 POSCAR/CIF/vasp/json 结构文件夹导入为标准 DataFrame。"
-            "该入口适合把甲方或同事提供的小批量结构作为 Stage 01 初筛数据；"
+            "该入口适合小批量结构作为 Stage 01 初筛数据；"
             "若结构文件不含 band gap 和 hull 信息，可先用默认值跑通流程，真实筛选应提供 metadata 表。"
         )
         intro.setWordWrap(True)
