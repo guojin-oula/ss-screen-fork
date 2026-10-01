@@ -586,7 +586,7 @@ class DatasetSourcePage(QWidget):
         subtitle = QLabel(
             "Materials Project 和 WBM 在这里作为外部材料数据源管理。"
             "SS-Screen 获取或导入数据后，将其规范化为工程内的本地 DataFrame；"
-            "后续组成模板筛选、结构描述和结构匹配使用这些本地数据，而不是把外部数据库当作计算模块。"
+            "后续组成模板筛选、结构描述和结构匹配使用这些本地数据。"
         )
         subtitle.setWordWrap(True)
         subtitle.setObjectName("pageDescription")
@@ -1005,7 +1005,6 @@ class DatasetSourcePage(QWidget):
         intro = QLabel(
             "把本地 POSCAR/CIF/vasp/json 结构文件夹导入为标准 DataFrame。"
             "该入口适合小批量结构作为 Stage 01 初筛数据；"
-            "若结构文件不含 band gap 和 hull 信息，可先用默认值跑通流程，真实筛选应提供 metadata 表。"
         )
         intro.setWordWrap(True)
         identity_layout.addWidget(intro)
@@ -4299,13 +4298,7 @@ class MainWindow(QMainWindow):
         )
 
         add_tool(
-            "打开工程",
-            self.open_existing_project,
-            icon_name="open_project",
-        )
-
-        add_tool(
-            "打开 .ssproject",
+            "打开工程文件.ssproject",
             self.open_project_file,
             icon_name="open_project_file",
         )
@@ -5221,22 +5214,6 @@ class MainWindow(QMainWindow):
 
         self.document_label.setText(f"{project.name} / 工程概览")
         self.statusBar().showMessage(f"已创建工程：{project.name}")
-
-    def open_existing_project(self) -> None:
-        value = QFileDialog.getExistingDirectory(
-            self,
-            "打开现有 SS-Screen 工程",
-            str(self.project_root()),
-        )
-        if not value:
-            return
-        project = self._add_project(
-            Path(value),
-            initialize=False,
-            activate=True,
-        )
-        self.document_label.setText(f"{project.name} / 工程概览")
-        self.statusBar().showMessage(f"已打开工程：{project.name}")
 
     def _project_settings_snapshot(self) -> dict[str, Any]:
         commands: dict[str, list[str]] = {}
