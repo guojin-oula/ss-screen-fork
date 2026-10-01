@@ -54,6 +54,64 @@ class MatterVizView(QWebEngineView):
 
     def _loaded(self, ok: bool) -> None:
         self._ready = ok
+        if ok:
+            self.page().runJavaScript("""
+            (() => {
+                const style = document.createElement('style');
+
+                style.textContent = `
+                    html,
+                    body,
+                    #app {
+                        width: 100% !important;
+                        height: 100% !important;
+                        min-width: 0 !important;
+                        min-height: 0 !important;
+
+                        margin: 0 !important;
+                        padding: 0 !important;
+
+                        overflow: hidden !important;
+
+                        background:
+                            radial-gradient(
+                            circle at 50% 45%,
+                            rgba(255, 255, 255, 0.95) 0%,
+                            rgba(238, 244, 250, 0.85) 40%,
+                            rgba(218, 229, 240, 0.90) 100%
+                        ),
+                            linear-gradient(
+                                135deg,
+                                #f7f9fc 0%,
+                                #dce7f1 100%
+                        )!important;nt;
+                    }
+
+                    #app > * {
+                        width: 100% !important;
+                        height: 100% !important;
+
+                        max-width: none !important;
+                        max-height: none !important;
+
+                        margin: 0 !important;
+
+                        background: transparent !important;
+                    }
+
+                    canvas {
+                        width: 100% !important;
+                        height: 100% !important;
+                        background: transparent !important;
+                    }
+                `;
+
+                document.head.appendChild(style);
+
+                window.dispatchEvent(new Event('resize'));
+            })();
+            """)
+
         if ok and self._pending:
             content, filename, label = self._pending
             self._pending = None
