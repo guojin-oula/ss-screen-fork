@@ -58,6 +58,7 @@ try:
         QTreeWidgetItem,
         QVBoxLayout,
         QWidget,
+        QMenu,
     )
 except ImportError as exc:  # pragma: no cover - exercised only without GUI extra
     raise RuntimeError(
@@ -4447,6 +4448,13 @@ class MainWindow(QMainWindow):
         self.files = QTreeView()
         self.files.setModel(self.file_model)
         self.files.doubleClicked.connect(self._open_selected_file)
+        # 右键上下文菜单
+        self.files.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.files.customContextMenuRequested.connect(
+            self._show_file_context_menu
+        )
         self.files.setObjectName("fileTree")
         self.bottom_tabs.addTab(self.files, "工程文件")
 
@@ -5411,6 +5419,106 @@ class MainWindow(QMainWindow):
         path = Path(self.file_model.filePath(index))
         if path.is_file():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+    
+    def _show_file_context_menu(self, position) -> None:
+        index = self.files.indexAt(position)
+
+        if not index.isValid():
+            return
+
+        path = Path(
+            self.file_model.filePath(index)
+        ).resolve()
+
+        # 这里只允许删除普通文件
+        if not path.is_file():
+            return
+
+        project_root = self.project_root().resolve()
+
+        # 安全检查：只能删除当前工程目录内部的文件
+        try:
+            path.relative_to(project_root)
+        except ValueError:
+            return
+
+        menu = QMenu(self)
+
+        delete_action = menu.addAction("删除文件")
+
+        action = menu.exec(
+            self.files.viewport().mapToGlobal(position)
+        )
+
+        if action == delete_action:
+            self._delete_project_file(path)
+    
+    
+    def _delete_project_file(self, path: Path) -> None:
+        if not path.is_file():
+            return
+
+        project_root = self.project_root().resolve()
+        path = path.resolve()
+
+        try:
+            relative = path.relative_to(project_root)
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "无法删除",
+                "只能删除当前工程目录中的文件。",
+            )
+            return
+        protected_files = {
+        ".ssscreen-project.json",
+        }
+
+        if path.name in protected_files:
+            QMessageBox.warning(
+                self,
+                "受保护的工程文件",
+                f"{path.name} 是 SS-Screen 工程文件，不能在这里删除。",
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "确认删除文件",
+            (
+                "确定要永久删除这个文件吗？\n\n"
+                f"{relative}\n\n"
+                "此操作不可撤销。"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            path.unlink()
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "删除失败",
+                f"无法删除文件：\n{path}\n\n{exc}",
+            )
+            return
+
+        self.statusBar().showMessage(
+            f"已删除文件：{relative}"
+        )
+
+        # 刷新相关界面
+        self._refresh_file_tree()
+        self._rebuild_project_tree()
+        self.dashboard.refresh()
+        self.structure_results_page.refresh()
+        self.phonon_results_page.refresh()
+        self.phase_results_page.refresh()
 
     def run_command(self, argv: list[str], title: str) -> None:
         if self.process.state() != QProcess.NotRunning:
