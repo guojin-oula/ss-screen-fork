@@ -281,6 +281,34 @@ class ValueEditor(QWidget):
                 self.widget.setPlainText(str(value))
         else:
             self.widget.setText("" if value is None else str(value))
+    
+    def set_value(self, value: Any) -> None:
+        """Restore a value previously saved in a project snapshot."""
+
+        if self._mode == "bool":
+            self.widget.setChecked(bool(value))
+            return
+
+        if self._mode == "choice":
+            self.widget.setCurrentText(
+                "" if value is None else str(value)
+            )
+            return
+
+        if self._mode == "multi":
+            if value is None:
+                self.widget.clear()
+            elif isinstance(value, (list, tuple)):
+                self.widget.setPlainText(
+                    "\n".join(str(item) for item in value)
+                )
+            else:
+                self.widget.setPlainText(str(value))
+            return
+
+        self.widget.setText(
+            "" if value is None else str(value)
+        )
 
     def _browse_single(self) -> None:
         path_type = self._path_type
@@ -486,6 +514,59 @@ class CommandPage(QWidget):
         if extra:
             argv.extend(shlex.split(extra))
         return argv
+    
+    def restore_argv(self, argv: list[str]) -> None:
+        """Restore GUI editors from a previously saved command argv."""
+
+        saved = [str(value) for value in argv]
+
+        # 保存时 page.argv() 包含 command_path，例如：
+        #
+        # ["stability", "relax", "--device", "cuda", ...]
+        #
+        # Click 当前 command 只需要后面的 option 参数。
+        prefix = list(self.presentation.command_path)
+
+        if saved[: len(prefix)] == prefix:
+            saved = saved[len(prefix):]
+
+        try:
+            with self.command.make_context(
+                self.command.name
+                or self.presentation.command_path[-1],
+                saved,
+                resilient_parsing=True,
+                ignore_unknown_options=True,
+                allow_extra_args=True,
+            ) as ctx:
+                params = dict(ctx.params)
+                extra_args = list(ctx.args)
+
+        except Exception as exc:
+            print(
+                "Failed to restore command settings:",
+                self.presentation.command_path,
+                exc,
+                flush=True,
+            )
+            return
+
+        for option, editor in self.editors:
+            if option.name in params:
+                editor.set_value(params[option.name])
+            else:
+                editor.reset()
+
+        # 当前 GUI 还有一个“附加参数”输入框。
+        # Click 不认识的参数重新放回这里。
+        if extra_args:
+            self.extra_args.setText(
+                shlex.join(extra_args)
+            )
+        else:
+            self.extra_args.clear()
+
+        self.refresh_preview()
 
     def missing_required(self) -> list[str]:
         missing = []
@@ -3617,6 +3698,8 @@ class ProjectRecord:
 
     name: str
     path: Path
+    # .ssproject 中保存的 GUI / command 参数快照。
+    settings: dict[str, Any] | None = None
 
 
 # Engineering-style logical groups. Stage numbering remains unchanged so it
@@ -3650,6 +3733,7 @@ STRUCTURE_MATCH_OBJECTS = (
     ("groups", "Structure Groups / 结构组"),
     ("summary", "Summary"),
 )
+
 
 
 def _read_csv_dicts(path: Path) -> list[dict[str, str]]:
@@ -4449,25 +4533,44 @@ class MainWindow(QMainWindow):
         name: str | None = None,
         initialize: bool,
         activate: bool,
+        settings: dict[str, Any] | None = None,
     ) -> ProjectRecord:
+
         path = path.expanduser().resolve()
+
         existing = self._project_by_path(path)
+
         if existing is not None:
+            if settings is not None:
+                existing.settings = dict(settings)
+
             if activate:
                 self._activate_project(existing)
+
             return existing
 
         if initialize:
             self._initialize_project_path(path)
 
-        project = ProjectRecord(name=name or path.name or "工程", path=path)
+        project = ProjectRecord(
+            name=name or path.name or "工程",
+            path=path,
+            settings=dict(settings or {}),
+        )
+
         self._projects.append(project)
-        if activate or self._active_project is None:
+
+        # 如果当前完全没有工程，就先把它设为 active。
+        # 已经存在 active project 时，不要提前覆盖，
+        # 这样 _activate_project() 才有机会保存旧工程的参数。
+        if self._active_project is None:
             self._active_project = project
 
         self._rebuild_project_tree()
+
         if activate:
             self._activate_project(project)
+
         return project
 
     def _initialize_project_path(self, root: Path) -> None:
@@ -5101,11 +5204,39 @@ class MainWindow(QMainWindow):
             )
             return
 
-    def _activate_project(self, project: ProjectRecord) -> None:
+    def _activate_project(
+        self,
+        project: ProjectRecord,
+    ) -> None:
+
+        previous = self._active_project
+
+        # 切走之前，把旧工程当前 GUI 参数保存到内存。
+        if (
+            previous is not None
+            and previous is not project
+        ):
+            previous.settings = (
+                self._project_settings_snapshot()
+            )
+
         self._active_project = project
-        self.active_project_label.setText(f"工程：{project.name}")
-        self.active_project_label.setToolTip(str(project.path))
+
+        # 恢复新工程自己的参数。
+        self._apply_project_settings(
+            project.settings
+        )
+
+        self.active_project_label.setText(
+            f"工程：{project.name}"
+        )
+
+        self.active_project_label.setToolTip(
+            str(project.path)
+        )
+
         self._refresh_file_tree()
+
         self.dashboard.refresh()
         self.structure_results_page.refresh()
         self.phonon_results_page.refresh()
@@ -5173,13 +5304,97 @@ class MainWindow(QMainWindow):
 
     def _project_settings_snapshot(self) -> dict[str, Any]:
         commands: dict[str, list[str]] = {}
+
+        # 先保留这个工程从 .ssproject 中加载出来、
+        # 但当前还没有打开过对应 GUI 页面的命令参数。
+        project = self._active_project
+
+        if (
+            project is not None
+            and isinstance(project.settings, dict)
+        ):
+            saved_commands = project.settings.get(
+                "commands",
+                {},
+            )
+
+            if isinstance(saved_commands, dict):
+                for key, argv in saved_commands.items():
+                    if isinstance(argv, list):
+                        commands[str(key)] = [
+                            str(value)
+                            for value in argv
+                        ]
+
+        # 已经真正打开/修改过的页面，以当前 GUI 状态覆盖旧值。
         for path, page in self._pages.items():
             commands[" ".join(path)] = page.argv()
+
         return {
-            "runtime_backend": self.runtime_backend.currentText(),
-            "wsl_project_path": self.wsl_root.text().strip(),
+            "runtime_backend":
+                self.runtime_backend.currentText(),
+
+            "wsl_project_path":
+                self.wsl_root.text().strip(),
+
             "commands": commands,
         }
+    
+    def _apply_project_settings(
+        self,
+        settings: dict[str, Any] | None,
+    ) -> None:
+        """Restore saved project settings into the GUI."""
+
+        if not isinstance(settings, dict):
+            settings = {}
+
+        # --------------------------------------------------
+        # Runtime backend
+        # --------------------------------------------------
+        backend = settings.get("runtime_backend")
+
+        if backend:
+            index = self.runtime_backend.findText(
+                str(backend)
+            )
+
+            if index >= 0:
+                self.runtime_backend.setCurrentIndex(
+                    index
+                )
+
+        # --------------------------------------------------
+        # WSL project path
+        # --------------------------------------------------
+        if "wsl_project_path" in settings:
+            self.wsl_root.setText(
+                str(
+                    settings.get(
+                        "wsl_project_path",
+                        "",
+                    )
+                )
+            )
+
+        # --------------------------------------------------
+        # Command pages that already exist
+        # --------------------------------------------------
+        commands = settings.get("commands", {})
+
+        if not isinstance(commands, dict):
+            commands = {}
+
+        for path, page in self._pages.items():
+            key = " ".join(path)
+            saved_argv = commands.get(key)
+
+            if isinstance(saved_argv, list):
+                page.restore_argv(saved_argv)
+            else:
+                # 这个工程没有保存该页面参数，
+                # 防止前一个工程的参数残留过来。
+                page.reset()
 
     def save_project_file(self) -> None:
         project = self._active_project
@@ -5198,10 +5413,16 @@ class MainWindow(QMainWindow):
         if target.suffix.lower() != ".ssproject":
             target = target.with_suffix(".ssproject")
         try:
+            project_settings = (
+            self._project_settings_snapshot()
+        )
+
+            project.settings = project_settings
+
             manifest = create_project_file(
                 project.path,
                 target,
-                project_settings=self._project_settings_snapshot(),
+                project_settings=project_settings,
             )
         except Exception as exc:
             QMessageBox.critical(self, "保存项目失败", str(exc))
@@ -5236,11 +5457,21 @@ class MainWindow(QMainWindow):
             )
             cache_root = cache_base / f"{source.stem}-{digest}"
             extract_project_file(source, cache_root)
+            saved_settings = project_metadata.get(
+                "settings",
+                {},
+            )
+            if not isinstance(saved_settings, dict):
+                saved_settings = {}
             project = self._add_project(
                 cache_root,
-                name=str(project_metadata.get("name") or source.stem),
+                name=str(
+                    project_metadata.get("name")
+                    or source.stem
+                ),
                 initialize=False,
                 activate=True,
+                settings=saved_settings,
             )
         except Exception as exc:
             QMessageBox.critical(self, "打开项目失败", str(exc))
@@ -5349,6 +5580,30 @@ class MainWindow(QMainWindow):
         page.run_requested.connect(self.run_command)
         self._pages[path] = page
         self.stack.addWidget(page)
+        self.stack.setCurrentWidget(page)
+                # --------------------------------------------------
+        # 如果当前工程的 .ssproject 保存了这个命令的参数，
+        # 在第一次打开这个页面时恢复。
+        # --------------------------------------------------
+        project = self._active_project
+
+        if (
+            project is not None
+            and isinstance(project.settings, dict)
+        ):
+            commands = project.settings.get(
+                "commands",
+                {},
+            )
+
+            if isinstance(commands, dict):
+                saved_argv = commands.get(
+                    " ".join(path)
+                )
+
+                if isinstance(saved_argv, list):
+                    page.restore_argv(saved_argv)
+
         self.stack.setCurrentWidget(page)
 
     # ---------------- Files / process ----------------
