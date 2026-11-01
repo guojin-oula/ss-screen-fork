@@ -1,0 +1,38 @@
+SS-Screen V1.0 / Stage 13 探测器材料应用性能评估（演示与预筛）
+
+本包只包括新增及修改的文件，不包括全部工程。
+请在现有 ss-screen-code 工程根目录下应用，完整路径已保留。
+
+方式一（推荐，git补丁）：
+  git switch -c feat/stage13-detector
+  git apply --check /path/to/SS-Screen_Stage13_探测器性能评估.patch
+  git apply /path/to/SS-Screen_Stage13_探测器性能评估.patch
+
+方式二（复制本压缩包的文件）：
+  unzip -o SS-Screen_Stage13_探测器性能评估_修改文件.zip -d /path/to/ss-screen-code
+
+验证：
+  source .venv/bin/activate
+  python -m pytest tests/test_detector.py tests/test_gui_project_file.py -q
+  ss-screen-gui
+
+界面入口：工程树 -> 结果与报告 -> 13 探测器性能评估
+Stage 12 输出：12_recommend/recommendations.csv
+可选器件证据：13_detector/device_measurements.csv
+默认导出：13_detector/detector_assessment.csv
+
+注意：演示数据为虚构数值；从带隙仅能估算带间截止波长，不能推出响应率或实际器件性能。
+
+修改文件：
+  src/ssscreen/detector.py
+  src/ssscreen/gui/detector_page.py
+  src/ssscreen/gui/app.py
+  src/ssscreen/gui/metadata.py
+  src/ssscreen/gui/icons.py
+  src/ssscreen/gui/project_file.py
+  tests/test_detector.py
+  tests/test_gui_project_file.py
+  docs/gui_stage13_detector.md
+  docs/PROJECT_LOG.md
+  ZMD/02_正式源码/gui.md
+  ZMD/07_版本与变更索引/README.md

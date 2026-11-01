@@ -1,0 +1,871 @@
+diff --git a/src/ssscreen/detector.py b/src/ssscreen/detector.py
+new file mode 100644
+--- /dev/null
++++ b/src/ssscreen/detector.py
+@@ -0,0 +1,223 @@
++"""Stage 13: reproducible *screening-level* photodetector suitability indicators.
++
++Only band-edge cutoff and wavelength coverage are inferred from band gaps.  No
++responsivity, dark current, NEP, detectivity or response time is fabricated;
++those quantities require external device-level measurements or simulations.
++"""
++
++from __future__ import annotations
++
++import csv
++import math
++from pathlib import Path
++from typing import Mapping
++
++PHOTON_ENERGY_EV_UM = 1.239841984  # hc/e in eV um (standard physical constants)
++DEFAULT_TARGET_UM = 2.0
++BAND_PRESETS_UM = {
++    "近红外（NIR）：1.0 μm": 1.0,
++    "短波红外（SWIR）：2.0 μm": 2.0,
++    "中波红外（MWIR）：4.0 μm": 4.0,
++    "长波红外（LWIR）：10.0 μm": 10.0,
++}
++DEVICE_COLUMNS = (
++    "responsivity_A_W",
++    "dark_current_A",
++    "nep_W_sqrtHz",
++    "rise_time_ms",
++    "area_cm2",
++    "detectivity_jones",
++)
++OUTPUT_COLUMNS = (
++    "candidate_id", "pair_index", "comp_a", "comp_b", "classification",
++    "fraction_b", "gap_eV", "gap_origin", "cutoff_um", "target_um",
++    "band_match", "energy_above_hull_eV_per_atom", "dynamical_status",
++    "hull_signal", *DEVICE_COLUMNS, "device_data_source", "data_origin", "caution",
++)
++
++
++def _number(value: object) -> float | None:
++    """Parse only finite numeric evidence (empty/NaN/Inf are not evidence)."""
++    if value is None or isinstance(value, bool):
++        return None
++    try:
++        result = float(str(value).strip())
++    except (TypeError, ValueError):
++        return None
++    return result if math.isfinite(result) else None
++
++
++def read_csv(path: Path) -> list[dict[str, str]]:
++    """Return data rows from UTF-8/UTF-8-BOM CSV; no arbitrary code execution."""
++    with path.open("r", encoding="utf-8-sig", newline="") as source:
++        return list(csv.DictReader(source))
++
++
++def _measurement_for(
++    row: Mapping[str, object], measurements: Mapping[str, Mapping[str, object]]
++) -> Mapping[str, object]:
++    key = str(row.get("recommendation_id") or row.get("pair_index") or "").strip()
++    return measurements.get(key, {}) if key else {}
++
++
++def index_measurements(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
++    """Accept Stage 13 device.csv with recommendation_id (or pair_index) as key."""
++    indexed = {}
++    for row in rows:
++        key = str(row.get("recommendation_id") or row.get("pair_index") or "").strip()
++        if key:
++            indexed[key] = row
++    return indexed
++
++
++def assess_candidate(
++    row: Mapping[str, object],
++    target_um: float,
++    measurements: Mapping[str, object] | None = None,
++    *,
++    data_origin: str = "工程结果",
++) -> dict[str, object]:
++    """Compute only physically supportable, clearly labelled band-edge estimates.
++
++    Gap priority: explicitly supplied alloy gap > linear interpolation of two
++    endmember gaps with reported alloy fraction.  Interpolation omits bowing,
++    strain and defects, and MUST NOT be confused with measured alloy gap.
++    """
++    target = _number(target_um)
++    if target is None or target <= 0:
++        raise ValueError("目标波长必须为正的有限数值（μm）")
++    measurements = measurements or {}
++    candidate_id = str(row.get("recommendation_id") or row.get("pair_index") or "未编号")
++    fraction = _number(row.get("actual_fraction_b"))
++    if fraction is None:
++        fraction = _number(row.get("target_fraction_b"))
++    if fraction is not None and not (0 <= fraction <= 1):
++        fraction = None
++
++    gap = None
++    origin = "无有效带隙数据"
++    for key in ("alloy_gap_eV", "gap_alloy_eV", "band_gap_eV"):
++        value = _number(row.get(key))
++        if value is not None and value > 0:
++            gap, origin = value, f"输入合金带隙（{key}）"
++            break
++    if gap is None:
++        gap_a, gap_b = _number(row.get("gap_a_eV")), _number(row.get("gap_b_eV"))
++        if (
++            gap_a is not None and gap_a >= 0 and gap_b is not None
++            and gap_b >= 0 and fraction is not None
++        ):
++            estimate = (1 - fraction) * gap_a + fraction * gap_b
++            if estimate > 0:
++                gap, origin = estimate, "端元带隙线性插值（未计弯曲参数，非实测）"
++
++    cutoff = PHOTON_ENERGY_EV_UM / gap if gap is not None else None
++    band_match = (
++        "待补充带隙" if cutoff is None else
++        "带隙覆盖" if target <= cutoff else "带隙不覆盖"
++    )
++    result: dict[str, object] = {
++        "candidate_id": candidate_id,
++        "pair_index": row.get("pair_index", ""),
++        "comp_a": row.get("comp_a", ""),
++        "comp_b": row.get("comp_b", ""),
++        "classification": row.get("classification", ""),
++        "fraction_b": fraction,
++        "gap_eV": gap,
++        "gap_origin": origin,
++        "cutoff_um": cutoff,
++        "target_um": target,
++        "band_match": band_match,
++        "energy_above_hull_eV_per_atom": row.get("energy_above_hull_eV_per_atom", ""),
++        "dynamical_status": row.get("dynamical_status", ""),
++        "hull_signal": row.get("hull_signal", ""),
++        "device_data_source": "未提供",
++        "data_origin": data_origin,
++        "caution": "仅为带隙与证据级预筛；不能证明器件实际响应率、暗电流、噪声或响应速度",
++    }
++    valid_measurement = False
++    for column in DEVICE_COLUMNS:
++        value = _number(measurements.get(column))
++        if value is not None and value >= 0:
++            result[column] = value
++            valid_measurement = True
++        else:
++            result[column] = None
++    # Specific detectivity D* = sqrt(A)/NEP when area in cm^2 and NEP in W/sqrt(Hz).
++    if result["detectivity_jones"] is None:
++        area, nep = result["area_cm2"], result["nep_W_sqrtHz"]
++        if area is not None and area > 0 and nep is not None and nep > 0:
++            result["detectivity_jones"] = math.sqrt(area) / nep
++            valid_measurement = True
++    if valid_measurement:
++        result["device_data_source"] = (
++            "内置虚构器件指标（仅演示）"
++            if data_origin.startswith("内置演示")
++            else "外部提供的器件数据"
++        )
++    return result
++
++
++def assess_rows(
++    rows: list[Mapping[str, object]], target_um: float,
++    measurements: Mapping[str, Mapping[str, object]] | None = None,
++    *, data_origin: str = "工程结果",
++) -> list[dict[str, object]]:
++    lookup = measurements or {}
++    return [
++        assess_candidate(
++            row, target_um, _measurement_for(row, lookup), data_origin=data_origin
++        )
++        for row in rows
++    ]
++
++
++def export_rows(path: Path, rows: list[dict[str, object]]) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with path.open("w", encoding="utf-8-sig", newline="") as output:
++        writer = csv.DictWriter(output, fieldnames=OUTPUT_COLUMNS, extrasaction="ignore")
++        writer.writeheader()
++        for row in rows:
++            writer.writerow(row)
++
++
++DEMO_ROWS: tuple[dict[str, str], ...] = (
++    {
++        "recommendation_id": "DEMO-001", "pair_index": "1", "comp_a": "演示端元A",
++        "comp_b": "演示端元B", "classification": "uncertain", "gap_a_eV": "0.38",
++        "gap_b_eV": "0.72", "target_fraction_b": "0.50",
++        "dynamical_status": "not-evaluated", "hull_signal": "not-evaluated",
++    },
++    {
++        "recommendation_id": "DEMO-002", "pair_index": "2", "comp_a": "演示端元C",
++        "comp_b": "演示端元D", "classification": "uncertain", "gap_a_eV": "0.13",
++        "gap_b_eV": "0.23", "target_fraction_b": "0.30",
++        "dynamical_status": "not-evaluated", "hull_signal": "not-evaluated",
++    },
++    {
++        "recommendation_id": "DEMO-003", "pair_index": "3", "comp_a": "演示端元E",
++        "comp_b": "演示端元F", "classification": "uncertain", "gap_a_eV": "1.6",
++        "gap_b_eV": "2.0", "target_fraction_b": "0.70",
++        "dynamical_status": "not-evaluated", "hull_signal": "not-evaluated",
++    },
++)
++
++
++# Fictitious instrument values exclusively for GUI demo mode. Not scientific evidence.
++DEMO_DEVICE_ROWS: tuple[dict[str, str], ...] = (
++    {
++        "recommendation_id": "DEMO-001", "responsivity_A_W": "0.8",
++        "dark_current_A": "1e-9", "nep_W_sqrtHz": "4e-12",
++        "rise_time_ms": "0.9", "area_cm2": "0.01",
++    },
++    {
++        "recommendation_id": "DEMO-002", "responsivity_A_W": "0.6",
++        "dark_current_A": "8e-9", "nep_W_sqrtHz": "2e-11",
++        "rise_time_ms": "2.4", "area_cm2": "0.02",
++    },
++    {
++        "recommendation_id": "DEMO-003", "responsivity_A_W": "0.2",
++        "dark_current_A": "2e-12", "nep_W_sqrtHz": "8e-13",
++        "rise_time_ms": "0.25", "area_cm2": "0.01",
++    },
++)
+diff --git a/src/ssscreen/gui/detector_page.py b/src/ssscreen/gui/detector_page.py
+new file mode 100644
+--- /dev/null
++++ b/src/ssscreen/gui/detector_page.py
+@@ -0,0 +1,250 @@
++"""Stage 13 demonstration-oriented detector application assessment page."""
++
++from __future__ import annotations
++
++import html
++from pathlib import Path
++
++from PySide6.QtCore import Qt
++from PySide6.QtWidgets import (
++    QAbstractItemView, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout,
++    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
++    QTableWidget, QTableWidgetItem, QTextBrowser, QVBoxLayout, QWidget,
++)
++
++from ..detector import (
++    BAND_PRESETS_UM, DEFAULT_TARGET_UM, DEMO_DEVICE_ROWS, DEMO_ROWS, assess_rows, export_rows,
++    index_measurements, read_csv,
++)
++
++
++class DetectorAssessmentPage(QWidget):
++    """Read real Stage 12 evidence; show clearly marked demo data on request."""
++
++    COLUMNS = (
++        ("candidate_id", "候选ID"),
++        ("comp_a", "端元A"),
++        ("comp_b", "端元B"),
++        ("fraction_b", "组分x"),
++        ("gap_eV", "带隙(eV)"),
++        ("cutoff_um", "截止波长(μm)"),
++        ("band_match", "目标波段"),
++        ("classification", "稳定性推荐"),
++        ("responsivity_A_W", "响应率(A/W)"),
++        ("dark_current_A", "暗电流(A)"),
++        ("nep_W_sqrtHz", "NEP(W/√Hz)"),
++        ("detectivity_jones", "D*(Jones)"),
++        ("rise_time_ms", "上升时间(ms)"),
++    )
++
++    def __init__(self, project_provider, parent: QWidget | None = None) -> None:
++        super().__init__(parent)
++        self.project_provider = project_provider
++        self._results: list[dict[str, object]] = []
++        self._source_rows: list[dict[str, str]] = []
++        self._demo_mode = False
++        self._setup()
++        self.refresh()
++
++    def _setup(self) -> None:
++        layout = QVBoxLayout(self)
++        layout.setContentsMargins(12, 10, 12, 10)
++        layout.setSpacing(9)
++
++        title_row = QHBoxLayout()
++        title = QLabel("探测器材料应用性能评估")
++        title.setObjectName("pageTitle")
++        title_row.addWidget(title)
++        title_row.addStretch(1)
++        status = QLabel("STAGE 13 · 展示 / 预筛")
++        status.setObjectName("stateBadge")
++        title_row.addWidget(status)
++        layout.addLayout(title_row)
++
++        self.warning = QLabel(
++            "说明：截止波长由带隙推算；端元线性插值不是合金实测带隙。"
++            "响应率、暗电流、NEP、D*、上升时间均需独立器件证据，未提供时显示“—”。"
++        )
++        self.warning.setWordWrap(True)
++        self.warning.setStyleSheet("color:#765316; background:#FFF5DE; padding:8px; border-radius:4px;")
++        layout.addWidget(self.warning)
++
++        controls = QGroupBox("评估输入 / 参数")
++        form = QFormLayout(controls)
++        form.setHorizontalSpacing(10)
++        self.recommend_path = QLineEdit("12_recommend/recommendations.csv")
++        self.recommend_path.setToolTip("工程根目录下的 Stage 12 推荐候选 CSV")
++        form.addRow("候选数据", self.recommend_path)
++        self.measurements_path = QLineEdit("13_detector/device_measurements.csv")
++        self.measurements_path.setToolTip(
++            "可选：按 recommendation_id/pair_index 关联外部器件指标；文件不存在表示没有器件数据"
++        )
++        form.addRow("器件数据(可选)", self.measurements_path)
++        band_row = QHBoxLayout()
++        self.band = QComboBox()
++        self.band.addItems(BAND_PRESETS_UM)
++        self.band.setCurrentIndex(1)
++        self.target = QDoubleSpinBox()
++        self.target.setDecimals(2)
++        self.target.setRange(0.01, 100.0)
++        self.target.setSuffix(" μm")
++        self.target.setValue(DEFAULT_TARGET_UM)
++        self.band.currentTextChanged.connect(self._preset_changed)
++        band_row.addWidget(self.band, 1)
++        band_row.addWidget(self.target)
++        form.addRow("目标波长", band_row)
++        layout.addWidget(controls)
++
++        actions = QHBoxLayout()
++        for label, handler in (
++            ("读取工程结果", self.refresh),
++            ("加载内置演示数据", self.load_demo),
++            ("重新评估", self.recompute),
++            ("导出评估 CSV", self.export),
++        ):
++            button = QPushButton(label)
++            button.clicked.connect(handler)
++            actions.addWidget(button)
++        actions.addStretch(1)
++        layout.addLayout(actions)
++
++        self.summary = QLabel("-")
++        self.summary.setStyleSheet("font-weight:600; padding:5px 0;")
++        layout.addWidget(self.summary)
++        self.table = QTableWidget(0, len(self.COLUMNS))
++        self.table.setHorizontalHeaderLabels([name for _, name in self.COLUMNS])
++        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
++        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
++        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
++        self.table.setAlternatingRowColors(True)
++        self.table.verticalHeader().setVisible(False)
++        self.table.setWordWrap(False)
++        self.table.setColumnWidth(0, 125)
++        self.table.setColumnWidth(1, 115)
++        self.table.setColumnWidth(2, 115)
++        self.table.setColumnWidth(6, 125)
++        self.table.itemSelectionChanged.connect(self._detail)
++        layout.addWidget(self.table, 3)
++
++        self.details = QTextBrowser()
++        self.details.setMaximumHeight(155)
++        self.details.setOpenExternalLinks(False)
++        layout.addWidget(self.details, 1)
++
++    def _root(self) -> Path:
++        return Path(self.project_provider()).expanduser().resolve()
++
++    def _resolve(self, value: str) -> Path:
++        path = Path(value.strip()).expanduser()
++        return path if path.is_absolute() else self._root() / path
++
++    def _preset_changed(self, label: str) -> None:
++        if label in BAND_PRESETS_UM:
++            self.target.setValue(BAND_PRESETS_UM[label])
++
++    def refresh(self) -> None:
++        """Switch to current project's real recommendations; never auto-invent data."""
++        self._demo_mode = False
++        path = self._resolve(self.recommend_path.text())
++        if path.is_file():
++            try:
++                self._source_rows = read_csv(path)
++            except (OSError, UnicodeError, ValueError) as exc:
++                self._source_rows = []
++                self.warning.setText(f"无法读取 Stage 12 结果：{exc}")
++        else:
++            self._source_rows = []
++            self.warning.setText(
++                f"尚无 Stage 12 推荐候选：{path}。可点击“加载内置演示数据”预览界面。"
++                "演示数据绝不代表真实计算或实测结果。"
++            )
++        self.recompute()
++
++    def load_demo(self) -> None:
++        self._demo_mode = True
++        self._source_rows = [dict(item) for item in DEMO_ROWS]
++        self.recompute()
++
++    def recompute(self) -> None:
++        measurements = index_measurements([dict(r) for r in DEMO_DEVICE_ROWS]) if self._demo_mode else {}
++        if not self._demo_mode:
++            candidate_file = self._resolve(self.measurements_path.text())
++            if candidate_file.is_file():
++                try:
++                    measurements = index_measurements(read_csv(candidate_file))
++                except (OSError, UnicodeError, ValueError) as exc:
++                    QMessageBox.warning(self, "器件数据读取失败", str(exc))
++        self._results = assess_rows(
++            self._source_rows, self.target.value(), measurements,
++            data_origin="内置演示（非真实材料）" if self._demo_mode else "工程结果",
++        )
++        if self._demo_mode:
++            self.warning.setText(
++                "当前使用虚构演示端元，仅展示计算链路和界面！"
++                "端元带隙和全部器件指标均为虚构输入；截止波长由线性插值估算，绝非科研证据。"
++            )
++        elif self._source_rows:
++            self.warning.setText(
++                "工程结果模式：使用Stage 12候选。若无实测合金带隙，则使用端元线性插值；"
++                "缺失器件参数显示“—”，不自动生成虚构数据。"
++            )
++        covered = sum(r["band_match"] == "带隙覆盖" for r in self._results)
++        device_data = sum(r["device_data_source"] != "未提供" for r in self._results)
++        self.summary.setText(
++            f"数据来源：{'内置虚构示例' if self._demo_mode else '工程文件'}   |   "
++            f"候选 {len(self._results)}   |   带隙覆盖 {covered}   |   有器件数据 {device_data}"
++        )
++        self.table.setRowCount(len(self._results))
++        for i, row in enumerate(self._results):
++            for j, (key, _) in enumerate(self.COLUMNS):
++                v = row.get(key)
++                value = "—" if v is None or v == "" else f"{v:.5g}" if isinstance(v, float) else str(v)
++                cell = QTableWidgetItem(value)
++                if j == 0:
++                    cell.setData(Qt.UserRole, i)
++                cell.setToolTip(str(v) if v is not None else "无器件数据/缺失")
++                if key == "band_match" and v == "带隙覆盖":
++                    cell.setForeground(Qt.darkGreen)
++                self.table.setItem(i, j, cell)
++        self.details.setHtml("<p>选择一行查看带隙依据、稳定性证据和数据来源。</p>")
++        if self._results:
++            self.table.selectRow(0)
++
++    def _detail(self) -> None:
++        selection = self.table.selectedItems()
++        if not selection:
++            return
++        i = selection[0].row()
++        if i >= len(self._results):
++            return
++        item = self._results[i]
++        safe = lambda key: html.escape(
++            str(item.get(key) if item.get(key) not in (None, "") else "—")
++        )
++        self.details.setHtml(
++            "<p><b>候选：</b>" + safe("candidate_id")
++            + "　<b>带隙来源：</b>" + safe("gap_origin")
++            + "　<b>数据类型：</b>" + safe("data_origin") + "</p>"
++            + "<p><b>凸包距离(eV/atom)：</b>" + safe("energy_above_hull_eV_per_atom")
++            + "　<b>声子状态：</b>" + safe("dynamical_status")
++            + "　<b>相稳定性：</b>" + safe("hull_signal") + "</p>"
++            + "<p><b>器件指标：</b>" + safe("device_data_source")
++            + "；<b>限制：</b>" + safe("caution") + "</p>"
++        )
++
++    def export(self) -> None:
++        if not self._results:
++            QMessageBox.information(self, "暂无结果", "请先读取Stage 12候选或加载演示数据。")
++            return
++        default = self._root() / "13_detector" / "detector_assessment.csv"
++        filename, _ = QFileDialog.getSaveFileName(
++            self, "导出探测器预筛结果", str(default), "CSV 文件 (*.csv)"
++        )
++        if not filename:
++            return
++        try:
++            export_rows(Path(filename), self._results)
++        except OSError as exc:
++            QMessageBox.critical(self, "导出失败", str(exc))
++            return
++        QMessageBox.information(self, "导出完成", f"已保存：\n{filename}")
+diff --git a/src/ssscreen/gui/app.py b/src/ssscreen/gui/app.py
+--- a/src/ssscreen/gui/app.py
++++ b/src/ssscreen/gui/app.py
+@@ -84,6 +84,7 @@
+         font_stylesheet,
+     )
+     from ssscreen.gui.icons import app_icon, stage_icon
++    from ssscreen.gui.detector_page import DetectorAssessmentPage
+     from ssscreen.gui.metadata import (
+         COMMANDS,
+         PATH_PRESETS,
+@@ -115,6 +116,7 @@
+         font_stylesheet,
+     )
+     from .icons import app_icon, stage_icon
++    from .detector_page import DetectorAssessmentPage
+     from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation, option_label_zh
+     from .project_file import create_project_file, extract_project_file, inspect_project_file
+     from .visualization import (
+@@ -3749,7 +3751,7 @@
+     ("电子结构", ("05", "06")),
+     ("合金模型", ("07", "08")),
+     ("稳定性分析", ("09", "10", "11")),
+-    ("结果与报告", ("12",)),
++    ("结果与报告", ("12", "13")),
+ )
+ 
+ COMPOSITION_SCREEN_OBJECTS = (
+@@ -4096,7 +4098,7 @@
+         self.project_name_value = QLabel("-")
+         self.project_root_value = QLabel("-")
+         self.project_root_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
+-        self.stage_value = QLabel("12")
++        self.stage_value = QLabel(str(len(STAGES) - 1))
+         self.artifact_value = QLabel("0")
+         info_form.addRow("工程名称", self.project_name_value)
+         info_form.addRow("工作目录", self.project_root_value)
+@@ -4108,7 +4110,7 @@
+         workflow_layout = QVBoxLayout(workflow_box)
+         workflow_layout.setContentsMargins(6, 8, 6, 6)
+ 
+-        self.table = QTableWidget(12, 5)
++        self.table = QTableWidget(len(STAGES) - 1, 5)
+         self.table.setHorizontalHeaderLabels(["Stage", "模块", "工作目录", "状态", "产物数"])
+         self.table.verticalHeader().setVisible(False)
+         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+@@ -4577,6 +4579,10 @@
+         self.recommendation_report_page = RecommendationReportPage(self.project_root)
+         self.recommendation_report_page.run_requested.connect(self.run_command)
+         self.stack.addWidget(self.recommendation_report_page)
++
++        # Stage 13 is a local GUI assessment, not a Click/DFT computation.
++        self.detector_assessment_page = DetectorAssessmentPage(self.project_root)
++        self.stack.addWidget(self.detector_assessment_page)
+ 
+         self.document_scroll = QScrollArea()
+         self.document_scroll.setWidgetResizable(True)
+@@ -5221,6 +5227,16 @@
+                     path=str(project.path / directory),
+                     status=status if count == 0 else f"{status} · {count} 项",
+                 )
++            elif sid == "13":
++                self.detector_assessment_page.refresh()
++                self.stack.setCurrentWidget(self.detector_assessment_page)
++                self.document_label.setText(f"{project.name} / 探测器性能评估")
++                self.inspector.set_selection(
++                    item_type="应用适配性评估",
++                    name="Stage 13：探测器性能评估（展示/预筛）",
++                    path=str(project.path / directory),
++                    status=status if count == 0 else f"{status} · {count} 项",
++                )
+             else:
+                 self.stack.setCurrentWidget(self.dashboard)
+                 self.document_label.setText(f"{project.name} / {sid} {stage_name}")
+@@ -5386,6 +5402,7 @@
+         self.structure_results_page.refresh()
+         self.phonon_results_page.refresh()
+         self.phase_results_page.refresh()
++        self.detector_assessment_page.refresh()
+ 
+     def new_project(self) -> None:
+         parent = QFileDialog.getExistingDirectory(
+@@ -5851,6 +5868,7 @@
+         self.structure_results_page.refresh()
+         self.phonon_results_page.refresh()
+         self.phase_results_page.refresh()
++        self.detector_assessment_page.refresh()
+ 
+     def run_command(self, argv: list[str], title: str) -> None:
+         if self.process.state() != QProcess.NotRunning:
+@@ -6074,6 +6092,7 @@
+         self.phonon_results_page.refresh()
+         self.phase_results_page.refresh()
+         self.recommendation_report_page.refresh()
++        self.detector_assessment_page.refresh()
+         self._refresh_file_tree()
+         self._rebuild_project_tree()
+ 
+diff --git a/src/ssscreen/gui/metadata.py b/src/ssscreen/gui/metadata.py
+--- a/src/ssscreen/gui/metadata.py
++++ b/src/ssscreen/gui/metadata.py
+@@ -132,6 +132,7 @@
+     ("10", "声子谱", "10_phonon"),
+     ("11", "竞争相 / 凸包", "11_phase"),
+     ("12", "综合推荐", "12_recommend"),
++    ("13", "探测器性能评估", "13_detector"),
+ )
+ 
+ 
+diff --git a/src/ssscreen/gui/icons.py b/src/ssscreen/gui/icons.py
+--- a/src/ssscreen/gui/icons.py
++++ b/src/ssscreen/gui/icons.py
+@@ -34,7 +34,7 @@
+ }
+ 
+ 
+-# 12 个科研阶段
++# 科研阶段（Stage 13 为GUI材料适配性评估，不启动额外科研计算）
+ _STAGE_ICON_SPECS = {
+     "01": ("drive-harddisk", SP.SP_DriveHDIcon),
+     "02": ("applications-science", SP.SP_ComputerIcon),
+@@ -48,6 +48,7 @@
+     "10": ("audio-x-generic", SP.SP_MediaPlay),
+     "11": ("office-chart-pie", SP.SP_FileDialogDetailedView),
+     "12": ("document-preview", SP.SP_FileDialogInfoView),
++    "13": ("office-chart-line", SP.SP_FileDialogInfoView),
+ }
+ 
+ 
+diff --git a/src/ssscreen/gui/project_file.py b/src/ssscreen/gui/project_file.py
+--- a/src/ssscreen/gui/project_file.py
++++ b/src/ssscreen/gui/project_file.py
+@@ -13,7 +13,7 @@
+ 
+ PROJECT_FORMAT = "ss-screen-project"
+ PROJECT_FORMAT_VERSION = 1
+-STAGE_PREFIXES = tuple(f"{index:02d}_" for index in range(1, 13))
++STAGE_PREFIXES = tuple(f"{index:02d}_" for index in range(1, 14))
+ 
+ 
+ def _sha256(path: Path) -> str:
+@@ -25,7 +25,7 @@
+ 
+ 
+ def iter_project_artifacts(project_root: Path) -> list[Path]:
+-    """Return deterministic Stage 01--12 files eligible for the project container."""
++    """Return deterministic Stage 01--13 files eligible for the project container."""
+     root = project_root.resolve()
+     files: list[Path] = []
+     for directory in sorted(root.iterdir() if root.exists() else []):
+diff --git a/tests/test_detector.py b/tests/test_detector.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_detector.py
+@@ -0,0 +1,77 @@
++"""Regression checks for Stage 13 screening-only detector indicators."""
++
++import csv
++import math
++
++import pytest
++
++from ssscreen.detector import (
++    DEMO_DEVICE_ROWS, DEMO_ROWS, PHOTON_ENERGY_EV_UM, assess_candidate, assess_rows,
++    export_rows, index_measurements, read_csv,
++)
++
++
++def test_linear_endmember_estimate_and_cutoff():
++    result = assess_candidate(
++        {"recommendation_id": "test-1", "gap_a_eV": "0.4", "gap_b_eV": "0.8",
++         "actual_fraction_b": "0.5"}, 2.0
++    )
++    assert result["gap_eV"] == pytest.approx(0.6)
++    assert result["cutoff_um"] == pytest.approx(PHOTON_ENERGY_EV_UM / 0.6)
++    assert result["band_match"] == "带隙覆盖"
++    assert "线性插值" in result["gap_origin"]
++    assert result["responsivity_A_W"] is None
++
++
++def test_supplied_alloy_gap_takes_precedence():
++    result = assess_candidate(
++        {"pair_index": "2", "alloy_gap_eV": "0.2", "gap_a_eV": "0.5",
++         "gap_b_eV": "0.9", "target_fraction_b": "0.5"}, 8.0
++    )
++    assert result["gap_eV"] == 0.2
++    assert result["band_match"] == "带隙不覆盖"
++    assert "输入合金带隙" in result["gap_origin"]
++
++
++def test_no_gap_when_fraction_missing_or_nonfinite():
++    for fraction in ("", "nan", "Infinity", "-0.2", "2.0"):
++        result = assess_candidate(
++            {"gap_a_eV": "0.2", "gap_b_eV": "0.5", "target_fraction_b": fraction},
++            2.0,
++        )
++        assert result["gap_eV"] is None
++        assert result["band_match"] == "待补充带隙"
++
++
++def test_external_device_values_are_not_invented():
++    measurements = index_measurements([{
++        "recommendation_id": "test-a", "responsivity_A_W": "0.8", "area_cm2": "0.01",
++        "nep_W_sqrtHz": "1e-12", "dark_current_A": "", "rise_time_ms": "0.4",
++    }])
++    assessed = assess_rows([{"recommendation_id": "test-a"}], 2.0, measurements)[0]
++    assert assessed["responsivity_A_W"] == 0.8
++    assert assessed["dark_current_A"] is None
++    assert assessed["detectivity_jones"] == pytest.approx(1e11)
++    assert assessed["device_data_source"] == "外部提供的器件数据"
++
++
++def test_invalid_target_wavelength():
++    for target in (0, -1, float("nan"), float("inf")):
++        with pytest.raises(ValueError):
++            assess_candidate({}, target)
++
++
++def test_demo_flag_and_export(tmp_path):
++    rows = assess_rows(
++        list(DEMO_ROWS), 2.0, index_measurements([dict(r) for r in DEMO_DEVICE_ROWS]),
++        data_origin="内置演示（非真实材料）",
++    )
++    assert len(rows) == 3
++    assert all(row["data_origin"] == "内置演示（非真实材料）" for row in rows)
++    output = tmp_path / "13_detector" / "assessed.csv"
++    export_rows(output, rows)
++    parsed = read_csv(output)
++    assert len(parsed) == 3
++    assert parsed[0]["candidate_id"] == "DEMO-001"
++    assert parsed[0]["responsivity_A_W"] == "0.8"
++    assert parsed[0]["device_data_source"] == "内置虚构器件指标（仅演示）"
+diff --git a/tests/test_gui_project_file.py b/tests/test_gui_project_file.py
+--- a/tests/test_gui_project_file.py
++++ b/tests/test_gui_project_file.py
+@@ -13,13 +13,15 @@
+     root = tmp_path / "demo"
+     (root / "01_dataset").mkdir(parents=True)
+     (root / "10_phonon" / "results").mkdir(parents=True)
++    (root / "13_detector").mkdir(parents=True)
+     (root / "01_dataset" / "input.json").write_text('{"formula":"CaSe"}', encoding="utf-8")
+     (root / "10_phonon" / "results" / "band.csv").write_text("q,f\n0,1\n", encoding="utf-8")
++    (root / "13_detector" / "detector_assessment.csv").write_text("id,cutoff\na,2\n", encoding="utf-8")
+     (root / "notes.txt").write_text("not a stage artifact", encoding="utf-8")
+ 
+     project_file = tmp_path / "demo.ssproject"
+     manifest = create_project_file(root, project_file, project_settings={"device": "cpu"})
+-    assert manifest["artifact_count"] == 2
++    assert manifest["artifact_count"] == 3
+ 
+     extracted = tmp_path / "opened"
+     extract_project_file(project_file, extracted)
+@@ -27,6 +29,7 @@
+         encoding="utf-8"
+     ) == '{"formula":"CaSe"}'
+     assert not (extracted / "notes.txt").exists()
++    assert (extracted / "13_detector" / "detector_assessment.csv").exists()
+     assert json.loads((extracted / ".ssscreen" / "project.json").read_text(encoding="utf-8"))[
+         "settings"
+     ] == {"device": "cpu"}
+diff --git a/docs/gui_stage13_detector.md b/docs/gui_stage13_detector.md
+new file mode 100644
+--- /dev/null
++++ b/docs/gui_stage13_detector.md
+@@ -0,0 +1,55 @@
++# Stage 13｜探测器材料应用性能评估（GUI演示与带隙预筛）
++
++此阶段在桌面 GUI 工程树的“结果与报告”下，位于 Stage 12 之后。新增阶段不修改现有 CLI 科学计算命令，不运行器件级仿真。
++
++## 用户操作
++
++1. 先完成 Stage 12 并生成 `12_recommend/recommendations.csv`。
++2. 左侧工程树单击“13 探测器性能评估”。
++3. 选择目标波长预设（1.0 / 2.0 / 4.0 / 10.0 μm），也可输入自定义波长。
++4. 点击“读取工程结果”和“重新评估”。表格显示端元、估计合金带隙、截止波长、目标波段是否在带隙范围内、推荐证据与可选的器件指标。
++5. 点击“导出评估 CSV”保存到 `13_detector/detector_assessment.csv`（可自定义路径）。
++6. 若 Stage 12 尚无输出，点击“加载内置演示数据”查看界面。此功能使用虚构的端元、输入带隙和虚构的器件指标（R、暗电流、NEP、上升时间、光敏面积），**不能用于科研判断或对外宣称真实性能**。
++
++## 计算逻辑与边界
++
++- 有合金带隙 `alloy_gap_eV` / `gap_alloy_eV` / `band_gap_eV` 时，直接使用输入数值（来源标签明确）。
++- 否则如果 `gap_a_eV`、`gap_b_eV` 和 `actual_fraction_b`（或 `target_fraction_b`）有效，按 `Eg(x)=(1-x)*Eg(A)+x*Eg(B)` 线性估算。未考虑弯曲参数、应变、缺陷或温度，因此属于简化模型，而非实际合金带隙测量。
++- 采用 `λc(μm)=1.239841984/Eg(eV)` 计算光子带间跃迁的名义截止波长；`目标波长<=λc` 仅表示从带隙角度可能覆盖该波长，并不保证量子效率或信噪比。
++- 使用 Stage 12 原有 `classification`、`energy_above_hull_eV_per_atom`、`dynamical_status`、`hull_signal` 作为稳定性证据，只展示原值，不额外判定可制备性。
++- **响应率、暗电流、噪声等效功率、响应时间及比探测率不可从材料带隙可靠推断**；无外部数据时显示“—”。
++- 如果外部提供有效光敏面积 `area_cm2` 与 NEP `nep_W_sqrtHz`，可由 `D*=sqrt(A)/NEP`（Jones）得到派生比探测率，其余字段不做拟合和补全。
++
++## 可选器件数据表
++
++默认读取 `13_detector/device_measurements.csv`；不存在时正常工作，器件指标留空。
++
++按 `recommendation_id`（优先）或 `pair_index` 匹配，CSV列名如下：
++
++```csv
++recommendation_id,responsivity_A_W,dark_current_A,nep_W_sqrtHz,rise_time_ms,area_cm2,detectivity_jones
++<真实推荐ID>,0.8,1e-9,1e-12,0.4,0.01,
++```
++
++上面的数值仅展示CSV列格式，不是该材料的真实测量值；填入真实数据前请核验器件条件、波长、温度、偏压和测量出处。
++
++## 文件清单
++
++- `src/ssscreen/detector.py`：标准库实现的带隙/器件证据计算和CSV导出
++- `src/ssscreen/gui/detector_page.py`：PySide6可视化页面、工程CSV读取和演示模式
++- `src/ssscreen/gui/metadata.py`：Stage 13工程树定义
++- `src/ssscreen/gui/app.py`：Stage 13页面注册和工程树导航
++- `src/ssscreen/gui/icons.py`：Stage 13图标
++- `src/ssscreen/gui/project_file.py`：将第13阶段产物纳入.ssproject单文件归档
++- `tests/test_detector.py`：预筛、缺失值、外部器件证据和导出的单元测试
++
++## 验证
++
++在项目`.venv`（含PySide6和pytest）中执行：
++
++```bash
++python -m pytest tests/test_detector.py -q
++python -m ssscreen.gui.app
++```
++
++如独立打开 app.py 的方式与本地安装习惯不同，可使用项目现有的 `ss-screen-gui` 启动命令。
+diff --git a/docs/PROJECT_LOG.md b/docs/PROJECT_LOG.md
+--- a/docs/PROJECT_LOG.md
++++ b/docs/PROJECT_LOG.md
+@@ -1,3 +1,18 @@
++## 2026-11-01 — 新增GUI Stage 13探测器性能预筛与演示
++
++**本次工作目标：** 在现有Stage 12之后展示探测器应用性能指标及数据来源。
++
++**已完成：**
++- 新增`src/ssscreen/detector.py`和`src/ssscreen/gui/detector_page.py`；修改GUI阶段元数据、工程树和图标。
++- 使用名义截止波长与现有稳定性证据做展示和预筛；器件级指标仅接受外部数据输入；演示示例明确标注非真实。
++- 新增`tests/test_detector.py`及`docs/gui_stage13_detector.md`，同步ZMD页面。
++
++**决策 / 计划变更：** Stage 13为GUI只读结果与外部器件证据关联，不新增科研计算CLI。
++
++**下一步：** 在具有PySide6的项目环境中进行GUI交互冒烟测试，补充实际器件指标及来源数据。
++
++**阻塞项 / 上游问题：** 当前归档未附带可运行的项目`.venv`及真实Stage 12结果，需在本地安装环境复核。
++
+ # PROJECT_LOG.md — Cross-session project log for `ss-screen`
+ 
+ > **Purpose:** Keep this long-running project on track across many sessions.
+diff --git a/ZMD/02_正式源码/gui.md b/ZMD/02_正式源码/gui.md
+--- a/ZMD/02_正式源码/gui.md
++++ b/ZMD/02_正式源码/gui.md
+@@ -14,6 +14,7 @@
+ | [`app.py`](../../src/ssscreen/gui/app.py) | PySide6 主窗口、工程树、专用阶段页面、命令日志和 `QProcess` 子进程执行；支持 IDE 直接按脚本启动、Windows GUI 调 WSL 后端、递归导入本地 POSCAR 文件夹 |
+ | [`launcher.py`](../../src/ssscreen/gui/launcher.py) | `ss-screen-gui` 控制台入口 |
+ | [`metadata.py`](../../src/ssscreen/gui/metadata.py) | 阶段标题、命令展示顺序和工程内默认路径预设 |
++| [`detector_page.py`](../../src/ssscreen/gui/detector_page.py) | Stage 13探测器应用预筛页面；CSV证据展示、虚构演示模式、导出 |
+ | [`appearance.py`](../../src/ssscreen/gui/appearance.py) | 字号范围、点数字体样式和随字号变化的控件/表格布局 |
+ | [`project_file.py`](../../src/ssscreen/gui/project_file.py) | `.ssproject` ZIP64 项目容器、SHA-256 清单、安全解包与原子保存 |
+ | [`visualization.py`](../../src/ssscreen/gui/visualization.py) | MatterViz 晶体、声子图表和竞争相/凸包结果页 |
+@@ -30,6 +31,7 @@
+   避免 WSL 后端误在 `src/ssscreen/gui` 子目录中查找 `.venv`。
+ - GUI 发往 WSL 的相对路径会统一把 Windows 反斜杠转换为 `/`；组成筛选页只自动加入真实存在的
+   `01_dataset/*.df`，避免不存在的 `mp.df/wbm.df` 被带入命令。
++- Stage 13探测器预筛纯计算逻辑位于`src/ssscreen/detector.py`，不依赖PySide6，可在无GUI环境单独测试。
+ - GUI 专用页面会把旧的 `src/ssscreen/gui/...` 阶段路径归一化为工程根目录相对路径；例如
+   `src/ssscreen/gui/03_condensed/local` 会显示并执行为 `03_condensed/local`。
+ - 数据源页支持 `dataset structures`，可把本地 POSCAR/CIF 文件夹导入为 Stage 1 DataFrame；结构归档页的
+@@ -48,7 +50,7 @@
+ - Stage 08/10/11 分别提供晶体、声子和竞争相可视化；晶体视图由内嵌 Qt WebEngine 加载随包分发的
+   MatterViz 前端，声子页显示状态/最低频率/band/DOS，竞争相页显示表格与三元组成图。
+ - MACE GUI 预设默认使用 `cpu`，仍允许用户手动输入 CUDA 设备；CLI 参数显示为“中文名称（英文参数）”。
+-- 工具栏可保存/打开 `.ssproject` 单文件；容器保存 Stage 01--12、用户命令配置和校验清单，不保存 MP API Key。
++- 工具栏可保存/打开 `.ssproject` 单文件；容器保存 Stage 01--13、用户命令配置和校验清单，不保存 MP API Key。
+ - SSH 目前仅实现只读验证按钮，检查认证、远端 Python、`ss-screen` 和可选工程目录，不提交远端计算。
+ 
+ ## 验证建议
+@@ -86,3 +88,5 @@
+   读取改为优先使用 GUI 注入的 `MP_API_KEY` 环境变量，避免 Stage 11 在 GUI 子进程中等待交互提示。
+ - 2026-09-11：GUI 右侧连接设置新增 Windows/WSL `.venv`/WSL `.venv-mlp` 后端选择；数据源页新增
+   本地 POSCAR 结构导入；结构归档页递归扫描子目录 POSCAR；已用 headless Qt 验证 GUI 调 WSL CLI 成功。
++
++- 2026-11-01：新增Stage 13“探测器性能评估”GUI页面（`detector_page.py`）与纯Python指标逻辑（`src/ssscreen/detector.py`）。从Stage 12读取推荐表，展示名义截止波长、目标波长适配、原稳定性证据，并按需读取器件实测字段；虚构演示数据明确标注。详见`docs/gui_stage13_detector.md`，回归测试`tests/test_detector.py`。
+diff --git a/ZMD/07_版本与变更索引/README.md b/ZMD/07_版本与变更索引/README.md
+--- a/ZMD/07_版本与变更索引/README.md
++++ b/ZMD/07_版本与变更索引/README.md
+@@ -598,3 +598,8 @@
+ - [文件资产总索引](../00_总览与使用规则/文件资产总索引.md)
+ - [工作区目录树](../00_总览与使用规则/工作区目录树.md)
+ - [`docs/PROJECT_LOG.md`](../../docs/PROJECT_LOG.md)
++
++### 2026-11-01 — Stage 13探测器性能评估（展示与预筛）
++
++- 新增工程树Stage 13及GUI独立面板，保存和展示可追溯的带隙/截止波长结果；缺失器件数据时不造数。
++- 新增测试`tests/test_detector.py`、文档`docs/gui_stage13_detector.md`，并更新GUI导航。源码提交由用户自行完成。

@@ -84,6 +84,7 @@ if __package__ in {None, ""}:
         font_stylesheet,
     )
     from ssscreen.gui.icons import app_icon, stage_icon
+    from ssscreen.gui.detector_page import DetectorAssessmentPage
     from ssscreen.gui.metadata import (
         COMMANDS,
         PATH_PRESETS,
@@ -115,6 +116,7 @@ else:
         font_stylesheet,
     )
     from .icons import app_icon, stage_icon
+    from .detector_page import DetectorAssessmentPage
     from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation, option_label_zh
     from .project_file import create_project_file, extract_project_file, inspect_project_file
     from .visualization import (
@@ -3749,7 +3751,7 @@ STAGE_GROUPS = (
     ("电子结构", ("05", "06")),
     ("合金模型", ("07", "08")),
     ("稳定性分析", ("09", "10", "11")),
-    ("结果与报告", ("12",)),
+    ("结果与报告", ("12", "13")),
 )
 
 COMPOSITION_SCREEN_OBJECTS = (
@@ -4096,7 +4098,7 @@ class Dashboard(QWidget):
         self.project_name_value = QLabel("-")
         self.project_root_value = QLabel("-")
         self.project_root_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.stage_value = QLabel("12")
+        self.stage_value = QLabel(str(len(STAGES) - 1))
         self.artifact_value = QLabel("0")
         info_form.addRow("工程名称", self.project_name_value)
         info_form.addRow("工作目录", self.project_root_value)
@@ -4108,7 +4110,7 @@ class Dashboard(QWidget):
         workflow_layout = QVBoxLayout(workflow_box)
         workflow_layout.setContentsMargins(6, 8, 6, 6)
 
-        self.table = QTableWidget(12, 5)
+        self.table = QTableWidget(len(STAGES) - 1, 5)
         self.table.setHorizontalHeaderLabels(["Stage", "模块", "工作目录", "状态", "产物数"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -4577,6 +4579,10 @@ class MainWindow(QMainWindow):
         self.recommendation_report_page = RecommendationReportPage(self.project_root)
         self.recommendation_report_page.run_requested.connect(self.run_command)
         self.stack.addWidget(self.recommendation_report_page)
+
+        # Stage 13 is a local GUI assessment, not a Click/DFT computation.
+        self.detector_assessment_page = DetectorAssessmentPage(self.project_root)
+        self.stack.addWidget(self.detector_assessment_page)
 
         self.document_scroll = QScrollArea()
         self.document_scroll.setWidgetResizable(True)
@@ -5221,6 +5227,16 @@ class MainWindow(QMainWindow):
                     path=str(project.path / directory),
                     status=status if count == 0 else f"{status} · {count} 项",
                 )
+            elif sid == "13":
+                self.detector_assessment_page.refresh()
+                self.stack.setCurrentWidget(self.detector_assessment_page)
+                self.document_label.setText(f"{project.name} / 探测器性能评估")
+                self.inspector.set_selection(
+                    item_type="应用适配性评估",
+                    name="Stage 13：探测器性能评估（展示/预筛）",
+                    path=str(project.path / directory),
+                    status=status if count == 0 else f"{status} · {count} 项",
+                )
             else:
                 self.stack.setCurrentWidget(self.dashboard)
                 self.document_label.setText(f"{project.name} / {sid} {stage_name}")
@@ -5386,6 +5402,7 @@ class MainWindow(QMainWindow):
         self.structure_results_page.refresh()
         self.phonon_results_page.refresh()
         self.phase_results_page.refresh()
+        self.detector_assessment_page.refresh()
 
     def new_project(self) -> None:
         parent = QFileDialog.getExistingDirectory(
@@ -5851,6 +5868,7 @@ class MainWindow(QMainWindow):
         self.structure_results_page.refresh()
         self.phonon_results_page.refresh()
         self.phase_results_page.refresh()
+        self.detector_assessment_page.refresh()
 
     def run_command(self, argv: list[str], title: str) -> None:
         if self.process.state() != QProcess.NotRunning:
@@ -6074,6 +6092,7 @@ class MainWindow(QMainWindow):
         self.phonon_results_page.refresh()
         self.phase_results_page.refresh()
         self.recommendation_report_page.refresh()
+        self.detector_assessment_page.refresh()
         self._refresh_file_tree()
         self._rebuild_project_tree()
 

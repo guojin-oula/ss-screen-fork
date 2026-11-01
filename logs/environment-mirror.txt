@@ -1,0 +1,10 @@
+HTTP/2 200 
+server: nginx/1.22.1
+date: Tue, 27 Oct 2026 05:16:32 GMT
+content-type: text/html
+content-length: 5201
+last-modified: Sat, 05 Sep 2026 19:16:30 GMT
+vary: Accept-Encoding
+etag: "6a9c6a8e-1451"
+accept-ranges: bytes
+

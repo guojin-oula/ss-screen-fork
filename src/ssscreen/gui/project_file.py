@@ -13,7 +13,7 @@ from typing import Any
 
 PROJECT_FORMAT = "ss-screen-project"
 PROJECT_FORMAT_VERSION = 1
-STAGE_PREFIXES = tuple(f"{index:02d}_" for index in range(1, 13))
+STAGE_PREFIXES = tuple(f"{index:02d}_" for index in range(1, 14))
 
 
 def _sha256(path: Path) -> str:
@@ -25,7 +25,7 @@ def _sha256(path: Path) -> str:
 
 
 def iter_project_artifacts(project_root: Path) -> list[Path]:
-    """Return deterministic Stage 01--12 files eligible for the project container."""
+    """Return deterministic Stage 01--13 files eligible for the project container."""
     root = project_root.resolve()
     files: list[Path] = []
     for directory in sorted(root.iterdir() if root.exists() else []):

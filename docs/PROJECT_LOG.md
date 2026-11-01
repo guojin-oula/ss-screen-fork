@@ -1,3 +1,18 @@
+## 2026-11-01 — 新增GUI Stage 13探测器性能预筛与演示
+
+**本次工作目标：** 在现有Stage 12之后展示探测器应用性能指标及数据来源。
+
+**已完成：**
+- 新增`src/ssscreen/detector.py`和`src/ssscreen/gui/detector_page.py`；修改GUI阶段元数据、工程树和图标。
+- 使用名义截止波长与现有稳定性证据做展示和预筛；器件级指标仅接受外部数据输入；演示示例明确标注非真实。
+- 新增`tests/test_detector.py`及`docs/gui_stage13_detector.md`，同步ZMD页面。
+
+**决策 / 计划变更：** Stage 13为GUI只读结果与外部器件证据关联，不新增科研计算CLI。
+
+**下一步：** 在具有PySide6的项目环境中进行GUI交互冒烟测试，补充实际器件指标及来源数据。
+
+**阻塞项 / 上游问题：** 当前归档未附带可运行的项目`.venv`及真实Stage 12结果，需在本地安装环境复核。
+
 # PROJECT_LOG.md — Cross-session project log for `ss-screen`
 
 > **Purpose:** Keep this long-running project on track across many sessions.

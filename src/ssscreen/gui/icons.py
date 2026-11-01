@@ -34,7 +34,7 @@ _ICON_SPECS = {
 }
 
 
-# 12 个科研阶段
+# 科研阶段（Stage 13 为GUI材料适配性评估，不启动额外科研计算）
 _STAGE_ICON_SPECS = {
     "01": ("drive-harddisk", SP.SP_DriveHDIcon),
     "02": ("applications-science", SP.SP_ComputerIcon),
@@ -48,6 +48,7 @@ _STAGE_ICON_SPECS = {
     "10": ("audio-x-generic", SP.SP_MediaPlay),
     "11": ("office-chart-pie", SP.SP_FileDialogDetailedView),
     "12": ("document-preview", SP.SP_FileDialogInfoView),
+    "13": ("office-chart-line", SP.SP_FileDialogInfoView),
 }
 
 

@@ -1,0 +1,292 @@
+Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+Obtaining file:///mnt/c/Users/Lenovo/ss-screen-latest
+  Installing build dependencies: started
+  Installing build dependencies: still running...
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Ignoring tomli: markers 'python_version < "3.11"' don't match your environment
+Collecting pytest>=7 (from -r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 17))
+  Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+Collecting ruff (from -r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 18))
+  Downloading ruff-0.17.3-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (10.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.6/10.6 MB 2.2 MB/s  0:00:04
+Collecting black (from -r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 19))
+  Downloading black-26.10.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (2.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 4.7 MB/s  0:00:00
+Collecting click>=8.0 (from ss-screen==1.0)
+  Downloading click-8.5.0-py3-none-any.whl (125 kB)
+Collecting monty>=2024.0 (from ss-screen==1.0)
+  Downloading monty-2026.10.21-py3-none-any.whl (63 kB)
+Collecting numpy>=1.24 (from ss-screen==1.0)
+  Downloading numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.9/16.9 MB 7.4 MB/s  0:00:02
+Collecting pandas>=2.0 (from ss-screen==1.0)
+  Downloading pandas-3.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 11.2 MB/s  0:00:01
+Collecting pymatgen>=2024.0 (from ss-screen==1.0)
+  Downloading pymatgen-2026.10.24-py3-none-any.whl (829 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 829.7/829.7 kB 8.4 MB/s  0:00:00
+Collecting tqdm>=4.0 (from ss-screen==1.0)
+  Downloading tqdm-4.70.1-py3-none-any.whl (80 kB)
+Collecting matminer>=0.10.1 (from ss-screen==1.0)
+  Downloading matminer-0.10.1-py3-none-any.whl (5.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.3/5.3 MB 13.0 MB/s  0:00:00
+Collecting robocrys>=0.2 (from ss-screen==1.0)
+  Downloading robocrys-0.2.13-py3-none-any.whl (3.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.6/3.6 MB 13.3 MB/s  0:00:00
+Requirement already satisfied: setuptools<81 in ./.venv/lib/python3.11/site-packages (from ss-screen==1.0) (79.0.1)
+Collecting pyside6<7,>=6.5 (from ss-screen==1.0)
+  Downloading pyside6-6.12.0-cp310-abi3-manylinux_2_34_x86_64.whl (577 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 577.7/577.7 kB 13.2 MB/s  0:00:00
+Collecting mp-api<0.47,>=0.46.4 (from ss-screen==1.0)
+  Downloading mp_api-0.46.5-py3-none-any.whl (157 kB)
+Collecting h5py>=3.10 (from ss-screen==1.0)
+  Downloading h5py-3.16.0-cp311-cp311-manylinux_2_28_x86_64.whl (5.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.0/5.0 MB 13.0 MB/s  0:00:00
+Collecting matplotlib>=3.8 (from ss-screen==1.0)
+  Downloading matplotlib-3.11.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (9.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.9/9.9 MB 14.5 MB/s  0:00:00
+Collecting phonopy<5,>=4.3 (from ss-screen==1.0)
+  Downloading phonopy-4.8.6-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (895 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 895.7/895.7 kB 15.4 MB/s  0:00:00
+Collecting seekpath>=2.1 (from ss-screen==1.0)
+  Downloading seekpath-2.2.2-py3-none-any.whl (78 kB)
+Collecting ase>=3.22 (from ss-screen==1.0)
+  Downloading ase-3.29.0-py3-none-any.whl (3.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 13.2 MB/s  0:00:00
+Collecting icet>=3.2 (from ss-screen==1.0)
+  Downloading icet-4.0.tar.gz (1.4 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 10.3 MB/s  0:00:00
+  Installing build dependencies: started
+  Installing build dependencies: still running...
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting typing-extensions>=3.7.4.1 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting requests>=2.23.0 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+Collecting emmet-core>=0.87.1 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading emmet_core-0.87.3-py3-none-any.whl (4.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.0/4.0 MB 9.8 MB/s  0:00:00
+Collecting boto3 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading boto3-1.43.119-py3-none-any.whl (140 kB)
+Collecting orjson<4,>=3.10 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading orjson-3.13.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (130 kB)
+Collecting pyarrow>=20.0.0 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pyarrow-26.0.0-cp311-cp311-manylinux_2_28_x86_64.whl (53.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.9/53.9 MB 14.3 MB/s  0:00:03
+Collecting deltalake<1.6.0,>=1.4.0 (from mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading deltalake-1.5.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (41.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 41.6/41.6 MB 15.2 MB/s  0:00:02
+Collecting arro3-core>=0.5.0 (from deltalake<1.6.0,>=1.4.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading arro3_core-0.9.1-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.1/3.1 MB 15.4 MB/s  0:00:00
+Collecting deprecated>=1.2.18 (from deltalake<1.6.0,>=1.4.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading deprecated-1.3.1-py2.py3-none-any.whl (11 kB)
+Collecting PyYAML>=5.3 (from phonopy<5,>=4.3->ss-screen==1.0)
+  Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 17.8 MB/s  0:00:00
+Collecting spglib>=2.5 (from phonopy<5,>=4.3->ss-screen==1.0)
+  Downloading spglib-2.8.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (974 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 974.1/974.1 kB 13.7 MB/s  0:00:00
+Collecting symfc>=1.7 (from phonopy<5,>=4.3->ss-screen==1.0)
+  Downloading symfc-1.7.3-py3-none-any.whl (114 kB)
+Collecting phonors>=0.6.0 (from phonopy<5,>=4.3->ss-screen==1.0)
+  Downloading phonors-0.6.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (1.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 14.4 MB/s  0:00:00
+Collecting PySide6_Essentials==6.12.0 (from pyside6<7,>=6.5->ss-screen==1.0)
+  Downloading pyside6_essentials-6.12.0-cp310-abi3-manylinux_2_34_x86_64.whl (84.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 84.3/84.3 MB 15.9 MB/s  0:00:05
+Collecting PySide6_Addons==6.12.0 (from pyside6<7,>=6.5->ss-screen==1.0)
+  Downloading pyside6_addons-6.12.0-cp310-abi3-manylinux_2_34_x86_64.whl (59.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.2/59.2 MB 14.4 MB/s  0:00:04
+Collecting PySide6_WebEngine==6.12.0.140 (from pyside6<7,>=6.5->ss-screen==1.0)
+  Downloading pyside6_webengine-6.12.0.140-cp310-abi3-manylinux_2_34_x86_64.whl (116.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 116.7/116.7 MB 15.9 MB/s  0:00:07
+Collecting PySide6_Pdf==6.12.0.140 (from pyside6<7,>=6.5->ss-screen==1.0)
+  Downloading pyside6_pdf-6.12.0.140-cp310-abi3-manylinux_2_34_x86_64.whl (2.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.8/2.8 MB 19.5 MB/s  0:00:00
+Collecting shiboken6==6.12.0 (from PySide6_Essentials==6.12.0->pyside6<7,>=6.5->ss-screen==1.0)
+  Downloading shiboken6-6.12.0-cp310-abi3-manylinux_2_34_x86_64.whl (279 kB)
+Collecting iniconfig>=1.0.1 (from pytest>=7->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 17))
+  Downloading iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Collecting packaging>=22 (from pytest>=7->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 17))
+  Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Collecting pluggy<2,>=1.5 (from pytest>=7->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 17))
+  Using cached pluggy-1.7.0-py3-none-any.whl (27 kB)
+Collecting pygments>=2.7.2 (from pytest>=7->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 17))
+  Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 17.0 MB/s  0:00:00
+Collecting mypy-extensions>=0.4.3 (from black->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 19))
+  Downloading mypy_extensions-1.1.0-py3-none-any.whl (5.0 kB)
+Collecting pathspec>=1.0.0 (from black->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 19))
+  Using cached pathspec-1.1.1-py3-none-any.whl (57 kB)
+Collecting platformdirs>=2 (from black->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 19))
+  Downloading platformdirs-4.13.5-py3-none-any.whl (32 kB)
+Collecting pytokens~=0.4.0 (from black->-r /mnt/c/Users/Lenovo/ss-screen-latest/requirements.txt (line 19))
+  Downloading pytokens-0.4.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (260 kB)
+Collecting scipy>=1.8.1 (from ase>=3.22->ss-screen==1.0)
+  Downloading scipy-1.17.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 16.1 MB/s  0:00:02
+Collecting wrapt<3,>=1.10 (from deprecated>=1.2.18->deltalake<1.6.0,>=1.4.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading wrapt-2.5.1-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (240 kB)
+Collecting pymatgen-core>=2026.7.31 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pymatgen_core-2026.10.16-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.6/4.6 MB 17.2 MB/s  0:00:00
+Collecting pydantic>=2.12 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+Collecting pydantic-settings>=2.0 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pydantic_settings-2.16.1-py3-none-any.whl (80 kB)
+Collecting pymatgen-io-validation>=0.1.1 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pymatgen_io_validation-0.1.4-py3-none-any.whl (43 kB)
+Collecting pybtex~=0.24 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pybtex-0.26.1-py3-none-any.whl (126 kB)
+Collecting blake3 (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading blake3-1.0.11-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (385 kB)
+Collecting inflect (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading inflect-7.6.0-py3-none-any.whl (37 kB)
+Collecting pubchempy (from emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pubchempy-1.0.5-py3-none-any.whl (21 kB)
+Collecting latexcodec>=1.0.4 (from pybtex~=0.24->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading latexcodec-3.0.1-py3-none-any.whl (18 kB)
+Collecting numba>=0.59 (from icet>=3.2->ss-screen==1.0)
+  Downloading numba-0.68.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (3.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.8/3.8 MB 15.7 MB/s  0:00:00
+Collecting trainstation>=1.1 (from icet>=3.2->ss-screen==1.0)
+  Downloading trainstation-1.2-py3-none-any.whl (26 kB)
+Collecting pandas>=2.0 (from ss-screen==1.0)
+  Downloading pandas-2.3.3-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.8/12.8 MB 15.5 MB/s  0:00:00
+Collecting pymongo~=4.5 (from matminer>=0.10.1->ss-screen==1.0)
+  Downloading pymongo-4.19.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 17.1 MB/s  0:00:00
+Collecting scikit-learn~=1.3 (from matminer>=0.10.1->ss-screen==1.0)
+  Downloading scikit_learn-1.9.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.3/9.3 MB 10.8 MB/s  0:00:00
+Collecting sympy~=1.11 (from matminer>=0.10.1->ss-screen==1.0)
+  Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 17.8 MB/s  0:00:00
+Collecting python-dateutil>=2.8.2 (from pandas>=2.0->ss-screen==1.0)
+  Downloading python_dateutil-3.0.0-py2.py3-none-any.whl (94 kB)
+Collecting pytz>=2020.1 (from pandas>=2.0->ss-screen==1.0)
+  Downloading pytz-2026.5-py2.py3-none-any.whl (506 kB)
+Collecting tzdata>=2022.7 (from pandas>=2.0->ss-screen==1.0)
+  Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
+Collecting dnspython<3.0.0,>=2.7.0 (from pymongo~=4.5->matminer>=0.10.1->ss-screen==1.0)
+  Downloading dnspython-2.9.0-py3-none-any.whl (354 kB)
+Collecting charset_normalizer<4,>=2 (from requests>=2.23.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+Collecting idna<4,>=2.5 (from requests>=2.23.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading idna-3.20-py3-none-any.whl (69 kB)
+Collecting urllib3<3,>=1.26 (from requests>=2.23.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+Collecting certifi>=2023.5.7 (from requests>=2.23.0->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+Collecting joblib>=1.4.0 (from scikit-learn~=1.3->matminer>=0.10.1->ss-screen==1.0)
+  Downloading joblib-1.6.0-py3-none-any.whl (306 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn~=1.3->matminer>=0.10.1->ss-screen==1.0)
+  Downloading narwhals-2.27.1-py3-none-any.whl (483 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn~=1.3->matminer>=0.10.1->ss-screen==1.0)
+  Downloading threadpoolctl-3.7.0-py3-none-any.whl (26 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy~=1.11->matminer>=0.10.1->ss-screen==1.0)
+  Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 18.5 MB/s  0:00:00
+Collecting cloudpickle>=3.0 (from joblib>=1.4.0->scikit-learn~=1.3->matminer>=0.10.1->ss-screen==1.0)
+  Downloading cloudpickle-3.1.2-py3-none-any.whl (22 kB)
+Collecting contourpy>=1.0.1 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (355 kB)
+Collecting cycler>=0.10 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Collecting fonttools>=4.28.2 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading fonttools-4.67.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 13.7 MB/s  0:00:00
+Collecting kiwisolver>=1.3.1 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading kiwisolver-1.5.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.4 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 13.9 MB/s  0:00:00
+Collecting pillow>=9 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 15.9 MB/s  0:00:00
+Collecting pyparsing>=3 (from matplotlib>=3.8->ss-screen==1.0)
+  Downloading pyparsing-3.3.3-py3-none-any.whl (126 kB)
+Collecting ruamel.yaml (from monty>=2024.0->ss-screen==1.0)
+  Downloading ruamel_yaml-0.19.1-py3-none-any.whl (118 kB)
+Collecting llvmlite<0.51,>=0.50.0dev0 (from numba>=0.59->icet>=3.2->ss-screen==1.0)
+  Downloading llvmlite-0.50.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (59.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.7/59.7 MB 13.6 MB/s  0:00:04
+Collecting annotated-types>=0.6.0 (from pydantic>=2.12->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Collecting pydantic-core==2.50.1 (from pydantic>=2.12->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading pydantic_core-2.50.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 17.6 MB/s  0:00:00
+Collecting typing-inspection>=0.4.4 (from pydantic>=2.12->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Collecting python-dotenv>=1.2.2 (from pydantic-settings>=2.0->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+Collecting bibtexparser<2,>=1 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading bibtexparser-1.4.4.tar.gz (55 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting lxml>=6.1.0 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading lxml-6.1.3-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 17.3 MB/s  0:00:00
+Collecting networkx>=2.7 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading networkx-3.6.1-py3-none-any.whl (2.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 18.1 MB/s  0:00:00
+Collecting palettable>=3.3.3 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading palettable-3.3.3-py2.py3-none-any.whl (332 kB)
+Collecting plotly>=5.0 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading plotly-7.1.0-py3-none-any.whl (9.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.7/9.7 MB 13.4 MB/s  0:00:00
+Collecting tabulate>=0.9.0 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading tabulate-0.10.0-py3-none-any.whl (39 kB)
+Collecting uncertainties>=3.1 (from pymatgen-core>=2026.7.31->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading uncertainties-3.2.3-py3-none-any.whl (60 kB)
+Collecting six>=1.6 (from python-dateutil>=2.8.2->pandas>=2.0->ss-screen==1.0)
+  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Collecting botocore<1.44.0,>=1.43.119 (from boto3->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading botocore-1.43.119-py3-none-any.whl (16.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.2/16.2 MB 14.7 MB/s  0:00:01
+Collecting jmespath<2.0.0,>=0.7.1 (from boto3->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading jmespath-1.1.0-py3-none-any.whl (20 kB)
+Collecting s3transfer<0.20.0,>=0.19.0 (from boto3->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading s3transfer-0.19.3-py3-none-any.whl (90 kB)
+Collecting python-dateutil>=2.8.2 (from pandas>=2.0->ss-screen==1.0)
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Collecting jaraco.functools (from inflect->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading jaraco_functools-4.6.0-py3-none-any.whl (11 kB)
+Collecting more_itertools>=8.5.0 (from inflect->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading more_itertools-11.2.1-py3-none-any.whl (74 kB)
+Collecting typeguard>=4.0.1 (from inflect->emmet-core>=0.87.1->mp-api<0.47,>=0.46.4->ss-screen==1.0)
+  Downloading typeguard-4.6.0-py3-none-any.whl (36 kB)
+Building wheels for collected packages: ss-screen, icet, bibtexparser
+  Building editable for ss-screen (pyproject.toml): started
+  Building editable for ss-screen (pyproject.toml): finished with status 'done'
+  Created wheel for ss-screen: filename=ss_screen-1.0-py3-none-any.whl size=7849 sha256=9dc693bba569c2c1066d6595584702b5552dab423dd2a069acd5cabfb5a8c879
+  Stored in directory: /tmp/pip-ephem-wheel-cache-g2gtmz5r/wheels/b4/9e/fc/a429d72d6a0e212dfc6476787da29a272487a137711d1be33b
+  Building wheel for icet (pyproject.toml): started
+  Building wheel for icet (pyproject.toml): still running...
+  Building wheel for icet (pyproject.toml): finished with status 'done'
+  Created wheel for icet: filename=icet-4.0-cp311-cp311-linux_x86_64.whl size=609478 sha256=f21f6a300ae886f2426e20b1c831fb31f8f609b5c39b10c07f6c7e60da5437c7
+  Stored in directory: /home/guojin/.cache/pip/wheels/2c/21/65/75940f0eac9d02b187ec367a3927187e67942f4a512f68e252
+  Building wheel for bibtexparser (pyproject.toml): started
+  Building wheel for bibtexparser (pyproject.toml): finished with status 'done'
+  Created wheel for bibtexparser: filename=bibtexparser-1.4.4-py3-none-any.whl size=43686 sha256=17fd8f020357773e54227f1da28bc0e259039e7e0757f37379718bd94f918c96
+  Stored in directory: /home/guojin/.cache/pip/wheels/ae/72/97/89b6bc7c3378d66468f9d0ef2a541f69c383a1941cc60cd320
+Successfully built ss-screen icet bibtexparser
+Installing collected packages: pytz, mpmath, wrapt, urllib3, uncertainties, tzdata, typing-extensions, tqdm, threadpoolctl, tabulate, sympy, six, shiboken6, ruff, ruamel.yaml, PyYAML, pytokens, python-dotenv, pyparsing, pygments, pyarrow, pubchempy, pluggy, platformdirs, pillow, phonors, pathspec, palettable, packaging, orjson, numpy, networkx, narwhals, mypy-extensions, more_itertools, lxml, llvmlite, latexcodec, kiwisolver, jmespath, iniconfig, idna, fonttools, dnspython, cycler, cloudpickle, click, charset_normalizer, certifi, annotated-types, typing-inspection, typeguard, spglib, scipy, requests, python-dateutil, pytest, PySide6_Essentials, pymongo, pydantic-core, pybtex, plotly, numba, monty, joblib, jaraco.functools, h5py, deprecated, contourpy, blake3, black, bibtexparser, arro3-core, symfc, seekpath, scikit-learn, PySide6_Pdf, PySide6_Addons, pydantic, pandas, matplotlib, inflect, deltalake, botocore, trainstation, s3transfer, PySide6_WebEngine, pymatgen-core, pydantic-settings, phonopy, ase, pyside6, pymatgen-io-validation, pymatgen, icet, boto3, ss-screen, matminer, emmet-core, robocrys, mp-api
+
+Successfully installed PySide6_Addons-6.12.0 PySide6_Essentials-6.12.0 PySide6_Pdf-6.12.0.140 PySide6_WebEngine-6.12.0.140 PyYAML-6.0.3 annotated-types-0.8.0 arro3-core-0.9.1 ase-3.29.0 bibtexparser-1.4.4 black-26.10.1 blake3-1.0.11 boto3-1.43.119 botocore-1.43.119 certifi-2026.10.23 charset_normalizer-3.5.2 click-8.5.0 cloudpickle-3.1.2 contourpy-1.3.3 cycler-0.12.1 deltalake-1.5.1 deprecated-1.3.1 dnspython-2.9.0 emmet-core-0.87.3 fonttools-4.67.0 h5py-3.16.0 icet-4.0 idna-3.20 inflect-7.6.0 iniconfig-2.3.1 jaraco.functools-4.6.0 jmespath-1.1.0 joblib-1.6.0 kiwisolver-1.5.1 latexcodec-3.0.1 llvmlite-0.50.0 lxml-6.1.3 matminer-0.10.1 matplotlib-3.11.2 monty-2026.10.21 more_itertools-11.2.1 mp-api-0.46.5 mpmath-1.3.0 mypy-extensions-1.1.0 narwhals-2.27.1 networkx-3.6.1 numba-0.68.0 numpy-2.4.6 orjson-3.13.0 packaging-26.3 palettable-3.3.3 pandas-2.3.3 pathspec-1.1.1 phonopy-4.8.6 phonors-0.6.0 pillow-13.0.0 platformdirs-4.13.5 plotly-7.1.0 pluggy-1.7.0 pubchempy-1.0.5 pyarrow-26.0.0 pybtex-0.26.1 pydantic-2.14.1 pydantic-core-2.50.1 pydantic-settings-2.16.1 pygments-2.21.0 pymatgen-2026.10.24 pymatgen-core-2026.10.16 pymatgen-io-validation-0.1.4 pymongo-4.19.0 pyparsing-3.3.3 pyside6-6.12.0 pytest-9.1.1 python-dateutil-2.9.0.post0 python-dotenv-1.2.4 pytokens-0.4.1 pytz-2026.5 requests-2.34.2 robocrys-0.2.13 ruamel.yaml-0.19.1 ruff-0.17.3 s3transfer-0.19.3 scikit-learn-1.9.1 scipy-1.17.1 seekpath-2.2.2 shiboken6-6.12.0 six-1.17.0 spglib-2.8.0 ss-screen-1.0 symfc-1.7.3 sympy-1.14.0 tabulate-0.10.0 threadpoolctl-3.7.0 tqdm-4.70.1 trainstation-1.2 typeguard-4.6.0 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.5 uncertainties-3.2.3 urllib3-2.8.0 wrapt-2.5.1

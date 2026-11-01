@@ -14,6 +14,7 @@
 | [`app.py`](../../src/ssscreen/gui/app.py) | PySide6 主窗口、工程树、专用阶段页面、命令日志和 `QProcess` 子进程执行；支持 IDE 直接按脚本启动、Windows GUI 调 WSL 后端、递归导入本地 POSCAR 文件夹 |
 | [`launcher.py`](../../src/ssscreen/gui/launcher.py) | `ss-screen-gui` 控制台入口 |
 | [`metadata.py`](../../src/ssscreen/gui/metadata.py) | 阶段标题、命令展示顺序和工程内默认路径预设 |
+| [`detector_page.py`](../../src/ssscreen/gui/detector_page.py) | Stage 13探测器应用预筛页面；CSV证据展示、虚构演示模式、导出 |
 | [`appearance.py`](../../src/ssscreen/gui/appearance.py) | 字号范围、点数字体样式和随字号变化的控件/表格布局 |
 | [`project_file.py`](../../src/ssscreen/gui/project_file.py) | `.ssproject` ZIP64 项目容器、SHA-256 清单、安全解包与原子保存 |
 | [`visualization.py`](../../src/ssscreen/gui/visualization.py) | MatterViz 晶体、声子图表和竞争相/凸包结果页 |
@@ -30,6 +31,7 @@
   避免 WSL 后端误在 `src/ssscreen/gui` 子目录中查找 `.venv`。
 - GUI 发往 WSL 的相对路径会统一把 Windows 反斜杠转换为 `/`；组成筛选页只自动加入真实存在的
   `01_dataset/*.df`，避免不存在的 `mp.df/wbm.df` 被带入命令。
+- Stage 13探测器预筛纯计算逻辑位于`src/ssscreen/detector.py`，不依赖PySide6，可在无GUI环境单独测试。
 - GUI 专用页面会把旧的 `src/ssscreen/gui/...` 阶段路径归一化为工程根目录相对路径；例如
   `src/ssscreen/gui/03_condensed/local` 会显示并执行为 `03_condensed/local`。
 - 数据源页支持 `dataset structures`，可把本地 POSCAR/CIF 文件夹导入为 Stage 1 DataFrame；结构归档页的
@@ -48,7 +50,7 @@
 - Stage 08/10/11 分别提供晶体、声子和竞争相可视化；晶体视图由内嵌 Qt WebEngine 加载随包分发的
   MatterViz 前端，声子页显示状态/最低频率/band/DOS，竞争相页显示表格与三元组成图。
 - MACE GUI 预设默认使用 `cpu`，仍允许用户手动输入 CUDA 设备；CLI 参数显示为“中文名称（英文参数）”。
-- 工具栏可保存/打开 `.ssproject` 单文件；容器保存 Stage 01--12、用户命令配置和校验清单，不保存 MP API Key。
+- 工具栏可保存/打开 `.ssproject` 单文件；容器保存 Stage 01--13、用户命令配置和校验清单，不保存 MP API Key。
 - SSH 目前仅实现只读验证按钮，检查认证、远端 Python、`ss-screen` 和可选工程目录，不提交远端计算。
 
 ## 验证建议
@@ -86,3 +88,5 @@
   读取改为优先使用 GUI 注入的 `MP_API_KEY` 环境变量，避免 Stage 11 在 GUI 子进程中等待交互提示。
 - 2026-09-11：GUI 右侧连接设置新增 Windows/WSL `.venv`/WSL `.venv-mlp` 后端选择；数据源页新增
   本地 POSCAR 结构导入；结构归档页递归扫描子目录 POSCAR；已用 headless Qt 验证 GUI 调 WSL CLI 成功。
+
+- 2026-11-01：新增Stage 13“探测器性能评估”GUI页面（`detector_page.py`）与纯Python指标逻辑（`src/ssscreen/detector.py`）。从Stage 12读取推荐表，展示名义截止波长、目标波长适配、原稳定性证据，并按需读取器件实测字段；虚构演示数据明确标注。详见`docs/gui_stage13_detector.md`，回归测试`tests/test_detector.py`。

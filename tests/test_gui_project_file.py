@@ -13,13 +13,15 @@ def test_project_file_round_trip_and_hash_validation(tmp_path: Path) -> None:
     root = tmp_path / "demo"
     (root / "01_dataset").mkdir(parents=True)
     (root / "10_phonon" / "results").mkdir(parents=True)
+    (root / "13_detector").mkdir(parents=True)
     (root / "01_dataset" / "input.json").write_text('{"formula":"CaSe"}', encoding="utf-8")
     (root / "10_phonon" / "results" / "band.csv").write_text("q,f\n0,1\n", encoding="utf-8")
+    (root / "13_detector" / "detector_assessment.csv").write_text("id,cutoff\na,2\n", encoding="utf-8")
     (root / "notes.txt").write_text("not a stage artifact", encoding="utf-8")
 
     project_file = tmp_path / "demo.ssproject"
     manifest = create_project_file(root, project_file, project_settings={"device": "cpu"})
-    assert manifest["artifact_count"] == 2
+    assert manifest["artifact_count"] == 3
 
     extracted = tmp_path / "opened"
     extract_project_file(project_file, extracted)
@@ -27,6 +29,7 @@ def test_project_file_round_trip_and_hash_validation(tmp_path: Path) -> None:
         encoding="utf-8"
     ) == '{"formula":"CaSe"}'
     assert not (extracted / "notes.txt").exists()
+    assert (extracted / "13_detector" / "detector_assessment.csv").exists()
     assert json.loads((extracted / ".ssscreen" / "project.json").read_text(encoding="utf-8"))[
         "settings"
     ] == {"device": "cpu"}
