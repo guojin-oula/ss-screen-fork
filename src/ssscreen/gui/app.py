@@ -97,6 +97,7 @@ if __package__ in {None, ""}:
         extract_project_file,
         inspect_project_file,
     )
+    from ssscreen.gui.runtime_paths import detect_checkout_venv, normalize_wsl_path
     from ssscreen.gui.visualization import (
         MatterVizView,
         PhaseResultsPage,
@@ -119,6 +120,7 @@ else:
     from .icons import app_icon, stage_icon
     from .metadata import COMMANDS, PATH_PRESETS, STAGES, CommandPresentation, option_label_zh
     from .project_file import create_project_file, extract_project_file, inspect_project_file
+    from .runtime_paths import detect_checkout_venv, normalize_wsl_path
     from .visualization import (
         MatterVizView,
         PhaseResultsPage,
@@ -135,11 +137,17 @@ PROJECT_DIRS = tuple(directory for _sid, _name, directory in STAGES if directory
 GUI_PACKAGE_RELATIVE_ROOT = ("src", "ssscreen", "gui")
 WSL_VENV_ACTIVATE = ".venv/bin/activate"
 WSL_MLP_VENV_ACTIVATE = ".venv-mlp/bin/activate"
+WSL_SCREEN_PATH_SETTING = "wsl/screen_activate"
+WSL_MLP_PATH_SETTING = "wsl/mlp_activate"
 MLP_COMMANDS = {
     ("stability", "relax"),
+    ("stability", "mixing-enthalpy"),
+    ("stability", "phonon-export"),
     ("stability", "phonon-forces"),
+    ("stability", "phonon-collect"),
     ("stability", "phonon-run"),
     ("stability", "competing-relax"),
+    ("stability", "convex-hull"),
     ("stability", "phase-diagram"),
 }
 
@@ -4302,6 +4310,18 @@ class InspectorPanel(QWidget):
         self.runtime_backend.setCurrentIndex(1)
         runtime_form.addRow("运行后端", self.runtime_backend)
 
+        # Machine-local paths: do NOT export these with portable .ssproject files.
+        self.wsl_screen_activate = QLineEdit()
+        self.wsl_screen_activate.setPlaceholderText(
+            "/mnt/c/.../ss-screen-latest/.venv/bin/activate"
+        )
+        runtime_form.addRow("WSL常规环境", self.wsl_screen_activate)
+        self.wsl_mlp_activate = QLineEdit()
+        self.wsl_mlp_activate.setPlaceholderText(
+            "/mnt/c/.../ss-screen-latest/.venv-mlp/bin/activate"
+        )
+        runtime_form.addRow("WSL MACE环境", self.wsl_mlp_activate)
+
         self.wsl_root = QLineEdit()
         self.wsl_root.setPlaceholderText("留空 = 自动把当前工程路径转换为 /mnt/<drive>/...")
         runtime_form.addRow("WSL 工程路径", self.wsl_root)
@@ -4312,7 +4332,8 @@ class InspectorPanel(QWidget):
         runtime_form.addRow("MP API Key", self.api_key)
         note = QLabel(
             "MP API Key 仅注入当前任务进程，不写入命令或项目文件。"
-            "WSL 自动选择会用 .venv 跑前中段/SQS，用 .venv-mlp 跑 MACE、phonon 和 phase-diagram。"
+            "WSL自动选择按任务调用上方两套本机环境，工作目录始终使用当前工程。"
+            "环境路径保存在本机用户设置中，不写入导出的工程文件。"
         )
         note.setWordWrap(True)
         note.setObjectName("optionHelp")
@@ -4741,6 +4762,9 @@ class MainWindow(QMainWindow):
         self.api_key = self.inspector.api_key
         self.runtime_backend = self.inspector.runtime_backend
         self.wsl_root = self.inspector.wsl_root
+        self.wsl_screen_activate = self.inspector.wsl_screen_activate
+        self.wsl_mlp_activate = self.inspector.wsl_mlp_activate
+        self._load_local_wsl_activate_settings()
         workspace.addWidget(inspector_frame)
 
         workspace.setSizes([300, 1020, 280])
@@ -5623,15 +5647,10 @@ class MainWindow(QMainWindow):
         # --------------------------------------------------
         # WSL project path
         # --------------------------------------------------
-        if "wsl_project_path" in settings:
-            self.wsl_root.setText(
-                str(
-                    settings.get(
-                        "wsl_project_path",
-                        "",
-                    )
-                )
-            )
+        # Clear the previous project's path when the new project has no override.
+        # Old .ssproject files may contain a path from another computer; imports
+        # explicitly discard that field in open_project_file().
+        self.wsl_root.setText(str(settings.get("wsl_project_path") or ""))
 
         # --------------------------------------------------
         # Command pages that already exist
@@ -5675,10 +5694,13 @@ class MainWindow(QMainWindow):
 
             project.settings = project_settings
 
+            # A WSL workdir belongs to this machine, not to a portable project.
+            portable_settings = dict(project_settings)
+            portable_settings.pop("wsl_project_path", None)
             manifest = create_project_file(
                 project.path,
                 target,
-                project_settings=project_settings,
+                project_settings=portable_settings,
             )
         except Exception as exc:
             QMessageBox.critical(self, "保存项目失败", str(exc))
@@ -5719,6 +5741,9 @@ class MainWindow(QMainWindow):
             )
             if not isinstance(saved_settings, dict):
                 saved_settings = {}
+            # Imported projects must not reuse another machine's WSL CWD.
+            saved_settings = dict(saved_settings)
+            saved_settings.pop("wsl_project_path", None)
             project = self._add_project(
                 cache_root,
                 name=str(
@@ -5994,8 +6019,12 @@ class MainWindow(QMainWindow):
         root.mkdir(parents=True, exist_ok=True)
         (root / "logs").mkdir(exist_ok=True)
 
-        backend_kind, backend_activate, backend_note = self._backend_for_command(argv)
-        preview = self._command_preview(argv, backend_kind, backend_activate, root)
+        try:
+            backend_kind, backend_activate, backend_note = self._backend_for_command(argv)
+            preview = self._command_preview(argv, backend_kind, backend_activate, root)
+        except ValueError as exc:
+            QMessageBox.warning(self, "WSL运行环境未配置", str(exc))
+            return
         self._current_run = RunRecord(
             started=datetime.now().isoformat(timespec="seconds"),
             command=preview,
@@ -6030,11 +6059,51 @@ class MainWindow(QMainWindow):
         self.process.start(program, args)
         self.statusBar().showMessage(f"{project.name} · 运行中：{title}")
 
+    def _load_local_wsl_activate_settings(self) -> None:
+        """Load per-computer WSL venv paths; do not use project metadata."""
+        screen_default = detect_checkout_venv(Path(__file__), ".venv")
+        mlp_default = detect_checkout_venv(Path(__file__), ".venv-mlp")
+        screen = self._display_settings.value(WSL_SCREEN_PATH_SETTING, None)
+        mlp = self._display_settings.value(WSL_MLP_PATH_SETTING, None)
+        self.wsl_screen_activate.setText(
+            screen_default if screen is None else str(screen)
+        )
+        self.wsl_mlp_activate.setText(
+            mlp_default if mlp is None else str(mlp)
+        )
+        self.wsl_screen_activate.editingFinished.connect(
+            lambda: self._save_local_wsl_activate_settings(
+                WSL_SCREEN_PATH_SETTING, self.wsl_screen_activate.text()
+            )
+        )
+        self.wsl_mlp_activate.editingFinished.connect(
+            lambda: self._save_local_wsl_activate_settings(
+                WSL_MLP_PATH_SETTING, self.wsl_mlp_activate.text()
+            )
+        )
+
+    def _save_local_wsl_activate_settings(self, key: str, value: str) -> None:
+        self._display_settings.setValue(key, value.strip())
+        self._display_settings.sync()
+
+    def _configured_wsl_activate(self, *, use_mlp: bool) -> str:
+        field = self.wsl_mlp_activate if use_mlp else self.wsl_screen_activate
+        label = "WSL MACE环境" if use_mlp else "WSL常规环境"
+        raw = field.text().strip()
+        if not raw:
+            raise ValueError(
+                f"请先在右侧 Properties → Connection 填写「{label}」的"
+                " bin/activate绝对路径；不要把虚拟环境放到每个工程目录。"
+            )
+        try:
+            return normalize_wsl_path(raw)
+        except ValueError as exc:
+            raise ValueError(f"{label}路径无效：{exc}") from exc
+
     def _recommended_wsl_activate(self, argv: list[str]) -> str:
-        command_key = tuple(argv[:2])
-        if command_key in MLP_COMMANDS:
-            return WSL_MLP_VENV_ACTIVATE
-        return WSL_VENV_ACTIVATE
+        return self._configured_wsl_activate(
+            use_mlp=tuple(argv[:2]) in MLP_COMMANDS
+        )
 
     def _backend_for_command(self, argv: list[str]) -> tuple[str, str, str | None]:
         backend_kind, backend_activate = self.runtime_backend.currentData()
@@ -6042,17 +6111,19 @@ class MainWindow(QMainWindow):
             selected = self._recommended_wsl_activate(argv)
             return "wsl", selected, f"Auto backend selected: {selected}"
 
-        command_key = tuple(argv[:2])
-        if (
-            backend_kind == "wsl"
-            and backend_activate == WSL_MLP_VENV_ACTIVATE
-            and command_key == ("stability", "sqs-generate")
-        ):
-            return (
-                "wsl",
-                WSL_VENV_ACTIVATE,
-                "SQS generation uses .venv to read NumPy-2 pickle datasets; MACE stages still use .venv-mlp.",
-            )
+        if backend_kind == "wsl":
+            use_mlp = backend_activate == WSL_MLP_VENV_ACTIVATE
+            command_key = tuple(argv[:2])
+            if use_mlp and command_key == ("stability", "sqs-generate"):
+                selected = self._configured_wsl_activate(use_mlp=False)
+                return (
+                    "wsl",
+                    selected,
+                    "SQS uses the normal environment for NumPy-2 pickle datasets; "
+                    "MACE and phonon tasks use the dedicated MLP environment.",
+                )
+            selected = self._configured_wsl_activate(use_mlp=use_mlp)
+            return "wsl", selected, f"Selected WSL environment: {selected}"
 
         return backend_kind, backend_activate, None
 
